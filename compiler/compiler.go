@@ -22,6 +22,7 @@ const (
 	PUSH_VARIABLE Opcode = iota + 10
 	PUSH_NUMBER
 	PUSH_STRING
+	DEFINE_VARIABLE Opcode = iota + 20
 )
 
 type BytecodeInstruction struct {
@@ -65,13 +66,52 @@ func (c *Compiler) CompileAST(ast interface{}) ([]BytecodeInstruction,  error) {
 }
 
 func (c *Compiler) compileNode(node interface{}) error {
-    switch n := node.(type) {
+	fmt.Println("Entering compileNode with node:", node)
+    
+	switch n := node.(type) {
     case []interface{}:
         if len(n) == 0 {
             return fmt.Errorf("empty expression")
         }
 
-		for _, operand := range n[1:] {
+		if identifierNode, ok := n[0].(parser.Identifier); ok {
+            switch identifierNode.Value {
+            case "def":
+				fmt.Println("Handling 'def' statement")
+                if len(n) != 3 {
+                    return fmt.Errorf("def expects two arguments")
+                }
+                varName, ok := n[1].(parser.Identifier)
+                if !ok {
+                    return fmt.Errorf("expected a variable name as the second argument to def")
+                }
+				fmt.Printf("Variable name for 'def': %s\n", varName.Value)
+                
+				err := c.compileNode(n[2]) // Compile the value to be assigned
+                if err != nil {
+                    return err
+                }
+				fmt.Printf("Emitting DEFINE_VARIABLE for %s\n", varName.Value)
+                c.emit(DEFINE_VARIABLE, varName.Value)
+                return nil
+
+            case "print":
+                if len(n) != 2 {
+                    return fmt.Errorf("print expects one argument")
+                }
+                err := c.compileNode(n[1]) // Compile the argument to print
+                if err != nil {
+                    return err
+                }
+                c.emit(PRINT)
+                return nil
+
+            // ... handle other specific keywords ...
+
+            }
+        }
+
+		for _, operand := range n {
             err := c.compileNode(operand)
             if err != nil {
                 return err
@@ -90,45 +130,7 @@ func (c *Compiler) compileNode(node interface{}) error {
             default:
                 return fmt.Errorf("unknown operator: %s", operatorNode.Value)
             }
-		} else
-        // Handle the first element in the expression
-        if identifierNode, ok := n[0].(parser.Identifier); ok {
-            switch identifierNode.Value {
-            case "print":
-                // Ensure there is one argument to print
-                if len(n) != 2 {
-                    return fmt.Errorf("print expects one argument")
-                }
-                // Compile the argument to print
-                err := c.compileNode(n[1])
-                if err != nil {
-                    return err
-                }
-                c.emit(PRINT)
-
-            case "def":
-                // Handle 'def' keyword logic
-                // ...
-
-            case "let":
-                // Handle 'let' keyword logic
-                // ...
-
-            default:
-                // If it's not a recognized keyword, treat as variable
-                fmt.Printf("Emitting Identifier: %v\n", identifierNode.Value)
-                c.emit(PUSH_VARIABLE, identifierNode.Value)
-            }
-        } else {
-            // If the first element is not an identifier, recursively compile it
-            for _, elem := range n {
-                err := c.compileNode(elem)
-                if err != nil {
-                    return err
-                }
-            }
-        }
-	
+		}
 
     case parser.Identifier:
         // Handle identifier (variable) nodes
@@ -149,6 +151,7 @@ func (c *Compiler) compileNode(node interface{}) error {
         return fmt.Errorf("unknown node type: %T", n)
     }
 
+	fmt.Println("Exiting compileNode")
     return nil
 }
 
@@ -202,6 +205,7 @@ func (c *Compiler) compileNode2(node interface{}) error {
 }
 
 func (c *Compiler) emit(opcode Opcode, operands ...interface{}) {
+	fmt.Printf("Emitting opcode: %d with operands: %v\n", opcode, operands)
 	opcodeBytes := []byte{byte(opcode)}
 	operandBytes := serializeOperands(operands)
 	c.bytecode = append(c.bytecode, opcodeBytes...)
@@ -212,25 +216,22 @@ func serializeOperands(operands []interface{}) []byte {
 	var result []byte
 
 	for _, operand := range operands {
-		fmt.Printf("Operand: %v, Type: %T\n", operand, operand)
+		fmt.Printf("Serializing Operand: %v, Type: %T\n", operand, operand)
 
 		switch v := operand.(type) {
 		case int:
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, uint32(v))
 			result = append(result, buf...)
-
 		case string:
-			strBytes := []byte(v)
-			if len(strBytes) > 1024 {
-				fmt.Println("String operand too long")
-				continue
-			}
-
-			lengthBuf := make([]byte, 4) // 4 bytes to store the length of the string
-			binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
-			result = append(result, lengthBuf...)
-			result = append(result, strBytes...)
+            fmt.Printf("Serializing string operand: %s\n", v)
+            strBytes := []byte(v)
+            lengthBuf := make([]byte, 4)
+            binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
+			fmt.Println(lengthBuf)
+			fmt.Println(strBytes)
+            result = append(result, lengthBuf...)
+            result = append(result, strBytes...)
 
 		default:
 			fmt.Printf("Unsupported operand type: %T\n", v)
@@ -285,8 +286,19 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
             operands = append(operands, varName)
             i += varNameLen
 
-		// Add cases for other opcodes that have operands
-		// ...
+        case DEFINE_VARIABLE:
+            if i+4 > len(rawBytecode) {
+                return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+            }
+            varNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+            i += 4
+
+            if i+varNameLen > len(rawBytecode) {
+                return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+            }
+            varName := string(rawBytecode[i : i+varNameLen])
+            operands = append(operands, varName)
+            i += varNameLen
 
 		default:
 			// Opcodes without operands do not modify 'i'

@@ -1,0 +1,5 @@
+[]interface {}{[]interface {}{parser.Operator{Value:"+"}, parser.Number{Value:2}, parser.Number{Value:9}}}
+Entering compileNode with node: [[{+} {2} {9}]]
+Entering compileNode with node: [{+} {2} {9}]
+Entering compileNode with node: {+}
+Error compiling AST: unknown node type: parser.Operator

@@ -61,7 +61,17 @@ func (vm *VM) Run() error {
 			value := vm.stack[len(vm.stack)-1]
 			fmt.Println(value)
 			vm.stack = vm.stack[:len(vm.stack)-1]
-		// Add cases for other instructions like SUB, GRT, IF, etc.
+		case compiler.DEFINE_VARIABLE:
+            if len(instruction.Operands) < 1 {
+                return fmt.Errorf("DEFINE_VARIABLE instruction requires a variable name as operand")
+            }
+            varName, ok := instruction.Operands[0].(string)
+            if !ok || len(vm.stack) == 0 {
+                return fmt.Errorf("DEFINE_VARIABLE requires a variable name as string and a value on the stack")
+            }
+            vm.symbolTable[varName] = vm.stack[len(vm.stack)-1]
+            vm.stack = vm.stack[:len(vm.stack)-1]
+            fmt.Printf("Variable %s defined with value: %v\n", varName, vm.symbolTable[varName])
 		case compiler.PUSH_VARIABLE:
             if len(instruction.Operands) < 1 {
                 return fmt.Errorf("PUSH_VARIABLE instruction requires a variable name as operand")
