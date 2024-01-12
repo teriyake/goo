@@ -112,13 +112,26 @@ func (c *Compiler) compileNode(node interface{}) error {
         }
 
 		for _, operand := range n {
+			if _, ok := n[0].(parser.Operator); ok {
+				// Compile all operands first
+				for _, operand := range n[1:] {
+					err := c.compileNode(operand)
+					if err != nil {
+						return err
+					}
+				}
+				return c.compileNode(n[0])
+			}
             err := c.compileNode(operand)
             if err != nil {
                 return err
             }
         }
 
+		/*
+		fmt.Printf("node:%v\n", n[0])
 		if operatorNode, ok := n[0].(parser.Operator); ok {
+			fmt.Println("hi================")
             switch operatorNode.Value {
             case "+":
                 c.emit(ADD)
@@ -131,6 +144,7 @@ func (c *Compiler) compileNode(node interface{}) error {
                 return fmt.Errorf("unknown operator: %s", operatorNode.Value)
             }
 		}
+		*/
 
     case parser.Identifier:
         // Handle identifier (variable) nodes
@@ -146,6 +160,21 @@ func (c *Compiler) compileNode(node interface{}) error {
         // Handle string nodes
         fmt.Printf("Emitting String: %v\n", n.Value)
         c.emit(PUSH_STRING, n.Value)
+	
+	case parser.Operator:
+        // Handle standalone operator nodes
+        switch n.Value {
+        case "+":
+            c.emit(ADD)
+        case "-":
+            c.emit(SUB)
+        case ">":
+            c.emit(GRT)
+        // ... other operators ...
+        default:
+            return fmt.Errorf("unknown operator: %s", n.Value)
+        }
+
 	
     default:
         return fmt.Errorf("unknown node type: %T", n)
