@@ -71,6 +71,26 @@ func (c *Compiler) compileNode(node interface{}) error {
             return fmt.Errorf("empty expression")
         }
 
+		for _, operand := range n[1:] {
+            err := c.compileNode(operand)
+            if err != nil {
+                return err
+            }
+        }
+
+		if operatorNode, ok := n[0].(parser.Operator); ok {
+            switch operatorNode.Value {
+            case "+":
+                c.emit(ADD)
+            case "-":
+                c.emit(SUB)
+            case ">":
+                c.emit(GRT)
+            // ... other operators ...
+            default:
+                return fmt.Errorf("unknown operator: %s", operatorNode.Value)
+            }
+		} else
         // Handle the first element in the expression
         if identifierNode, ok := n[0].(parser.Identifier); ok {
             switch identifierNode.Value {
@@ -109,19 +129,6 @@ func (c *Compiler) compileNode(node interface{}) error {
             }
         }
 	
-        if operatorNode, ok := n[0].(parser.Operator); ok {
-            switch operatorNode.Value {
-            case "+":
-                c.emit(ADD)
-            case "-":
-                c.emit(SUB)
-            case ">":
-                c.emit(GRT)
-            // Add more cases for other operators
-            default:
-                return fmt.Errorf("unknown operator: %s", operatorNode.Value)
-            }
-		}
 
     case parser.Identifier:
         // Handle identifier (variable) nodes
@@ -138,19 +145,6 @@ func (c *Compiler) compileNode(node interface{}) error {
         fmt.Printf("Emitting String: %v\n", n.Value)
         c.emit(PUSH_STRING, n.Value)
 	
-	case parser.Operator:
-		switch n.Value {
-            case "+":
-                c.emit(ADD)
-            case "-":
-                c.emit(SUB)
-            case ">":
-                c.emit(GRT)
-            // Add more cases for other operators
-            default:
-                return fmt.Errorf("unknown operator: %s", n.Value)
-        }
-
     default:
         return fmt.Errorf("unknown node type: %T", n)
     }
