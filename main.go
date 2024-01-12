@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	gooCode := "(print 51)"
+	gooCode := "(+ 12 9)"
 	lexer := lexer.NewLexer(gooCode)
 	par := parser.NewParser(lexer)
 	ast, err := par.Parse()

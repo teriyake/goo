@@ -19,7 +19,7 @@ const (
 	GRT
 	IF
 	PRINT
-	PUSH_VARIABLE Opcode = iota
+	PUSH_VARIABLE Opcode = iota + 10
 	PUSH_NUMBER
 	PUSH_STRING
 )
@@ -65,6 +65,100 @@ func (c *Compiler) CompileAST(ast interface{}) ([]BytecodeInstruction,  error) {
 }
 
 func (c *Compiler) compileNode(node interface{}) error {
+    switch n := node.(type) {
+    case []interface{}:
+        if len(n) == 0 {
+            return fmt.Errorf("empty expression")
+        }
+
+        // Handle the first element in the expression
+        if identifierNode, ok := n[0].(parser.Identifier); ok {
+            switch identifierNode.Value {
+            case "print":
+                // Ensure there is one argument to print
+                if len(n) != 2 {
+                    return fmt.Errorf("print expects one argument")
+                }
+                // Compile the argument to print
+                err := c.compileNode(n[1])
+                if err != nil {
+                    return err
+                }
+                c.emit(PRINT)
+
+            case "def":
+                // Handle 'def' keyword logic
+                // ...
+
+            case "let":
+                // Handle 'let' keyword logic
+                // ...
+
+            default:
+                // If it's not a recognized keyword, treat as variable
+                fmt.Printf("Emitting Identifier: %v\n", identifierNode.Value)
+                c.emit(PUSH_VARIABLE, identifierNode.Value)
+            }
+        } else {
+            // If the first element is not an identifier, recursively compile it
+            for _, elem := range n {
+                err := c.compileNode(elem)
+                if err != nil {
+                    return err
+                }
+            }
+        }
+	
+        if operatorNode, ok := n[0].(parser.Operator); ok {
+            switch operatorNode.Value {
+            case "+":
+                c.emit(ADD)
+            case "-":
+                c.emit(SUB)
+            case ">":
+                c.emit(GRT)
+            // Add more cases for other operators
+            default:
+                return fmt.Errorf("unknown operator: %s", operatorNode.Value)
+            }
+		}
+
+    case parser.Identifier:
+        // Handle identifier (variable) nodes
+        fmt.Printf("Emitting Identifier: %v\n", n.Value)
+        c.emit(PUSH_VARIABLE, n.Value)
+
+    case parser.Number:
+        // Handle number nodes
+        fmt.Printf("Emitting Number: %v\n", n.Value)
+        c.emit(PUSH_NUMBER, n.Value)
+
+    case parser.String:
+        // Handle string nodes
+        fmt.Printf("Emitting String: %v\n", n.Value)
+        c.emit(PUSH_STRING, n.Value)
+	
+	case parser.Operator:
+		switch n.Value {
+            case "+":
+                c.emit(ADD)
+            case "-":
+                c.emit(SUB)
+            case ">":
+                c.emit(GRT)
+            // Add more cases for other operators
+            default:
+                return fmt.Errorf("unknown operator: %s", n.Value)
+        }
+
+    default:
+        return fmt.Errorf("unknown node type: %T", n)
+    }
+
+    return nil
+}
+
+func (c *Compiler) compileNode2(node interface{}) error {
 	switch n := node.(type) {
 	case []interface{}:
 		if len(n) == 0 {
@@ -183,6 +277,19 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			str := string(rawBytecode[i : i+strLen])
 			operands = append(operands, str)
 			i += strLen
+       case PUSH_VARIABLE:
+            if i+4 > len(rawBytecode) {
+                return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+            }
+            varNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+            i += 4
+
+            if i+varNameLen > len(rawBytecode) {
+                return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+            }
+            varName := string(rawBytecode[i : i+varNameLen])
+            operands = append(operands, varName)
+            i += varNameLen
 
 		// Add cases for other opcodes that have operands
 		// ...

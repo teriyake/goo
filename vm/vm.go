@@ -9,6 +9,7 @@ type VM struct {
 	stack []interface{}
 	pc    int
 	code  []compiler.BytecodeInstruction
+	symbolTable map[string]interface{}
 }
 
 func NewVM(code []compiler.BytecodeInstruction) *VM {
@@ -16,6 +17,7 @@ func NewVM(code []compiler.BytecodeInstruction) *VM {
 		stack: make([]interface{}, 0),
 		pc:    0,
 		code:  code,
+		symbolTable: make(map[string]interface{}),
 	}
 }
 
@@ -60,6 +62,20 @@ func (vm *VM) Run() error {
 			fmt.Println(value)
 			vm.stack = vm.stack[:len(vm.stack)-1]
 		// Add cases for other instructions like SUB, GRT, IF, etc.
+		case compiler.PUSH_VARIABLE:
+            if len(instruction.Operands) < 1 {
+                return fmt.Errorf("PUSH_VARIABLE instruction requires a variable name as operand")
+            }
+            varName, ok := instruction.Operands[0].(string)
+            if !ok {
+                return fmt.Errorf("PUSH_VARIABLE operand must be a string")
+            }
+            value, exists := vm.symbolTable[varName]
+            if !exists {
+                return fmt.Errorf("Variable %s not defined", varName)
+            }
+            vm.stack = append(vm.stack, value)
+            fmt.Printf("Stack after PUSH_VARIABLE (%s): %v\n", varName, vm.stack)
 		default:
 			return fmt.Errorf("Unknown instruction: %v", instruction.Opcode)
 		}
