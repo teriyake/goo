@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	gooCode := "(print xx)"
+	gooCode := "(def x 2) (if (> x 10) (print 2))"
+	//gooCode := "(print -5.1)"
 	lexer := lexer.NewLexer(gooCode)
 	par := parser.NewParser(lexer)
 	ast, err := par.Parse()

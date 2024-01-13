@@ -31,7 +31,7 @@ var tokenTypes = []struct {
 	{LPAREN, `^\(`},
 	{RPAREN, `^\)`},
 	{IDENT, `^[a-zA-Z_][a-zA-Z0-9_]*`},
-	{NUMBER, `^\d+`},
+	{NUMBER, `^-?\d+(\.\d+)?`},
 	{STRING, `^'[^']*'`},
 	{OPERATOR, `^[><=+]+`}, 
 	{WHITESPACE, `^\s+`},
@@ -90,3 +90,4 @@ func (l *Lexer) NextToken() Token {
 	l.readChar()
 	return tok
 }
+
