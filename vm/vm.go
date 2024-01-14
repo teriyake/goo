@@ -104,6 +104,45 @@ func (vm *VM) Run() error {
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
 			fmt.Printf("Stack after GRT: %v\n", vm.stack)
+		case compiler.LESS:
+			if len(vm.stack) < 2 {
+				return fmt.Errorf("LESS instruction requires at least 2 values on the stack")
+			}
+			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
+			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("LESS instruction requires float operands")
+			}
+			result := operand1 < operand2
+			vm.stack = vm.stack[:len(vm.stack)-2]
+			vm.stack = append(vm.stack, result)
+			fmt.Printf("Stack after LESS: %v\n", vm.stack)
+		case compiler.EQ:
+			if len(vm.stack) < 2 {
+				return fmt.Errorf("EQ instruction requires at least 2 values on the stack")
+			}
+			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
+			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("EQ instruction requires float operands")
+			}
+			result := operand1 == operand2
+			vm.stack = vm.stack[:len(vm.stack)-2]
+			vm.stack = append(vm.stack, result)
+			fmt.Printf("Stack after EQ: %v\n", vm.stack)
+		case compiler.NEQ:
+			if len(vm.stack) < 2 {
+				return fmt.Errorf("NEQ instruction requires at least 2 values on the stack")
+			}
+			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
+			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("NEQ instruction requires float operands")
+			}
+			result := operand1 != operand2
+			vm.stack = vm.stack[:len(vm.stack)-2]
+			vm.stack = append(vm.stack, result)
+			fmt.Printf("Stack after NEQ: %v\n", vm.stack)
 		case compiler.PRINT:
 			if len(vm.stack) < 1 {
 				return fmt.Errorf("PRINT instruction requires a value on the stack")

@@ -19,15 +19,18 @@ const (
 	ADD Opcode = iota
 	SUB
 	GRT
+	LESS
+	EQ
+	NEQ
 	IF
 	ELSE
 	ENDIF
 	PRINT
-	PUSH_VARIABLE Opcode = iota + 10
+	PUSH_VARIABLE Opcode = iota + 20
 	PUSH_NUMBER
 	PUSH_BOOL
 	PUSH_STRING
-	DEFINE_VARIABLE Opcode = iota + 20
+	DEFINE_VARIABLE Opcode = iota + 30
 )
 
 type BytecodeInstruction struct {
@@ -150,6 +153,12 @@ func (c *Compiler) compileNode(node interface{}) error {
 			c.emit(SUB)
 		case ">":
 			c.emit(GRT)
+		case "<":
+			c.emit(LESS)
+		case "=":
+			c.emit(EQ)
+		case "?":
+			c.emit(NEQ)
 		// ... other operators ...
 		default:
 			return fmt.Errorf("unknown operator: %s", n.Value)

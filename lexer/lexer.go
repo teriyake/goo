@@ -35,7 +35,7 @@ var tokenTypes = []struct {
 	{IDENT, `^[a-zA-Z_][a-zA-Z0-9_]*`},
 	{NUMBER, `^-?\d+(\.\d+)?`},
 	{STRING, `^'[^']*'`},
-	{OPERATOR, `^[-><=+]+`},
+	{OPERATOR, `^[-><=+?]+`},
 	{WHITESPACE, `^\s+`},
 	{COMMENT, `^;[^\n]*`},
 }
