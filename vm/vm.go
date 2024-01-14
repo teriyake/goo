@@ -42,6 +42,29 @@ func (vm *VM) Run() error {
 			floatValue := math.Float64frombits(bits)
 			vm.stack = append(vm.stack, floatValue)
 			fmt.Printf("Stack after PUSH_NUMBER: %v\n", vm.stack)
+		case compiler.PUSH_BOOL:
+			if len(instruction.Operands) < 1 {
+				return fmt.Errorf("PUSH_BOOL instruction requires an operand")
+			}
+			operandByte, ok := instruction.Operands[0].(byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand for PUSH_BOOL instruction")
+			}
+			boolValue := operandByte != 0
+			vm.stack = append(vm.stack, boolValue)
+			fmt.Printf("Stack after PUSH_BOOL: %v\n", vm.stack)
+
+		case compiler.PUSH_STRING:
+			if len(instruction.Operands) < 1 {
+				return fmt.Errorf("PUSH_STRING instruction requires an operand")
+			}
+			operandBytes, ok := instruction.Operands[0].([]byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand type for PUSH_STRING instruction")
+			}
+			stringValue := string(operandBytes)
+			vm.stack = append(vm.stack, stringValue)
+			fmt.Printf("Stack after PUSH_STRING: %v\n", vm.stack)
 		case compiler.ADD:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("ADD instruction requires at least 2 values on the stack")
@@ -56,9 +79,18 @@ func (vm *VM) Run() error {
 			vm.stack = append(vm.stack, result)
 			fmt.Printf("Stack after ADD: %v\n", vm.stack)
 		case compiler.SUB:
-			// Handle SUB instruction
-			// Implement subtraction similar to ADD
-
+			if len(vm.stack) < 2 {
+				return fmt.Errorf("SUB instruction requires at least 2 values on the stack")
+			}
+			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
+			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("SUB instruction requires float operands")
+			}
+			result := operand1 - operand2
+			vm.stack = vm.stack[:len(vm.stack)-2]
+			vm.stack = append(vm.stack, result)
+			fmt.Printf("Stack after SUB: %v\n", vm.stack)
 		case compiler.GRT:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("GRT instruction requires at least 2 values on the stack")
@@ -83,10 +115,11 @@ func (vm *VM) Run() error {
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("DEFINE_VARIABLE instruction requires a variable name as operand")
 			}
-			varName, ok := instruction.Operands[0].(string)
+			varBytes, ok := instruction.Operands[0].([]byte)
 			if !ok || len(vm.stack) == 0 {
-				return fmt.Errorf("DEFINE_VARIABLE requires a variable name as string and a value on the stack")
+				return fmt.Errorf("DEFINE_VARIABLE requires a variable name and a value on the stack")
 			}
+			varName := string(varBytes)
 			vm.symbolTable[varName] = vm.stack[len(vm.stack)-1]
 			vm.stack = vm.stack[:len(vm.stack)-1]
 			fmt.Printf("Variable %s defined with value: %v\n", varName, vm.symbolTable[varName])
@@ -94,12 +127,13 @@ func (vm *VM) Run() error {
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("PUSH_VARIABLE instruction requires a variable name as operand")
 			}
-			varName, ok := instruction.Operands[0].(string)
+			varBytes, ok := instruction.Operands[0].([]byte)
 			if !ok {
-				return fmt.Errorf("PUSH_VARIABLE operand must be a string")
+				return fmt.Errorf("Invalid operand type for PUSH_VARIABLE instruction")
 			}
-			value, exists := vm.symbolTable[varName]
-			if !exists {
+			varName := string(varBytes)
+			value, ok := vm.symbolTable[varName]
+			if !ok {
 				return fmt.Errorf("Variable %s not defined", varName)
 			}
 			vm.stack = append(vm.stack, value)

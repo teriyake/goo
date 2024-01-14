@@ -14,6 +14,10 @@ type Number struct {
 	Value float64
 }
 
+type Boolean struct {
+	Value bool
+}
+
 type String struct {
 	Value string
 }
@@ -70,18 +74,24 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			return nil, err
 		}
 		result = Number{Value: floatValue}
+	case lexer.BOOL:
+		if p.currentToken.Literal == "true" {
+			result = Boolean{Value: true}
+		} else {
+			result = Boolean{Value: false}
+		}
 	case lexer.STRING:
 		result = String{Value: p.currentToken.Literal}
 	case lexer.OPERATOR:
 		operator := Operator{Value: p.currentToken.Literal}
-		p.nextToken()                            
-		firstOperand, err := p.parseExpression() 
+		p.nextToken()
+		firstOperand, err := p.parseExpression()
 		if err != nil {
 			return nil, err
 		}
 
-		p.nextToken()                             
-		secondOperand, err := p.parseExpression() 
+		p.nextToken()
+		secondOperand, err := p.parseExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -112,10 +122,10 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			result = nestedExpressions
 		}
 
-		p.nextToken() 
+		p.nextToken()
 	case lexer.RPAREN:
-		p.nextToken()   
-		return nil, nil 
+		p.nextToken()
+		return nil, nil
 	default:
 		err = fmt.Errorf("Unexpected token: %s", p.currentToken.Literal)
 	}
@@ -132,7 +142,7 @@ func (p *Parser) parseIfStatement() (IfStatement, error) {
 		return IfStatement{}, fmt.Errorf("expected '(' after 'if'")
 	}
 
-	p.nextToken() 
+	p.nextToken()
 	condition, err := p.parseExpression()
 	if err != nil {
 		return IfStatement{}, err
@@ -143,7 +153,7 @@ func (p *Parser) parseIfStatement() (IfStatement, error) {
 		return IfStatement{}, fmt.Errorf("expected ')' after if condition")
 	}
 
-	p.nextToken() 
+	p.nextToken()
 	thenBlock, err := p.parseExpression()
 	if err != nil {
 		return IfStatement{}, err
@@ -183,6 +193,7 @@ func (p *Parser) Parse() (interface{}, error) {
 		}
 		ast = append(ast, expression)
 
+		//fmt.Printf("Parsed expression: %v\n", expression)
 		p.nextToken()
 	}
 

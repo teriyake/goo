@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	_"fmt"
+	_ "fmt"
 	"regexp"
 	"unicode"
 )
@@ -16,6 +16,7 @@ const (
 	RPAREN     = "RPAREN"
 	IDENT      = "IDENT"
 	NUMBER     = "NUMBER"
+	BOOL       = "BOOL"
 	STRING     = "STRING"
 	OPERATOR   = "OPERATOR"
 	WHITESPACE = "WHITESPACE"
@@ -30,20 +31,21 @@ var tokenTypes = []struct {
 }{
 	{LPAREN, `^\(`},
 	{RPAREN, `^\)`},
+	{BOOL, `^true|^false`},
 	{IDENT, `^[a-zA-Z_][a-zA-Z0-9_]*`},
 	{NUMBER, `^-?\d+(\.\d+)?`},
 	{STRING, `^'[^']*'`},
-	{OPERATOR, `^[><=+]+`}, 
+	{OPERATOR, `^[-><=+]+`},
 	{WHITESPACE, `^\s+`},
 	{COMMENT, `^;[^\n]*`},
 }
 
 type Lexer struct {
 	input        string
-	position     int   
-	readPosition int   
-	ch           rune  
-	currentToken Token 
+	position     int
+	readPosition int
+	ch           rune
+	currentToken Token
 }
 
 func NewLexer(input string) *Lexer {
@@ -58,7 +60,7 @@ func (l *Lexer) readChar() {
 	} else {
 		l.ch = rune(l.input[l.readPosition])
 	}
-	//fmt.Printf("Current char: %c\n", l.ch) 
+	//fmt.Printf("Current char: %c\n", l.ch)
 	l.position = l.readPosition
 	l.readPosition++
 }
@@ -90,4 +92,3 @@ func (l *Lexer) NextToken() Token {
 	l.readChar()
 	return tok
 }
-

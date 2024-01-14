@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 	"teriyake/goo/parser"
 )
 
@@ -24,6 +25,7 @@ const (
 	PRINT
 	PUSH_VARIABLE Opcode = iota + 10
 	PUSH_NUMBER
+	PUSH_BOOL
 	PUSH_STRING
 	DEFINE_VARIABLE Opcode = iota + 20
 )
@@ -90,7 +92,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 				}
 				//fmt.Printf("Variable name for 'def': %s\n", varName.Value)
 
-				err := c.compileNode(n[2]) 
+				err := c.compileNode(n[2])
 				if err != nil {
 					return err
 				}
@@ -102,7 +104,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 				if len(n) != 2 {
 					return fmt.Errorf("print expects one argument")
 				}
-				err := c.compileNode(n[1]) 
+				err := c.compileNode(n[1])
 				if err != nil {
 					return err
 				}
@@ -129,15 +131,17 @@ func (c *Compiler) compileNode(node interface{}) error {
 			}
 		}
 
-
 	case parser.Identifier:
 		//fmt.Printf("Emitting Identifier: %v\n", n.Value)
 		c.emit(PUSH_VARIABLE, n.Value)
 	case parser.Number:
 		c.emit(PUSH_NUMBER, n.Value)
+	case parser.Boolean:
+		c.emit(PUSH_BOOL, n.Value)
 	case parser.String:
 		//fmt.Printf("Emitting String: %v\n", n.Value)
-		c.emit(PUSH_STRING, n.Value)
+		strVal := strings.Trim(n.Value, "'")
+		c.emit(PUSH_STRING, strVal)
 	case parser.Operator:
 		switch n.Value {
 		case "+":
@@ -202,12 +206,12 @@ func serializeOperands(operands []interface{}) []byte {
 
 		switch v := operand.(type) {
 		case int, float64:
-			fmt.Printf("floating-point number:%v\n", operand)
+			//fmt.Printf("Serializing floating-point number:%v\n", operand)
 			bits := math.Float64bits(v.(float64))
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, bits)
 			result = append(result, buf...)
-			fmt.Printf("converted bytes:%v\n", result)
+			//fmt.Printf("converted bytes:%v\n", result)
 		case string:
 			//fmt.Printf("Serializing string operand: %s\n", v)
 			strBytes := []byte(v)
@@ -217,7 +221,12 @@ func serializeOperands(operands []interface{}) []byte {
 			//fmt.Println(strBytes)
 			result = append(result, lengthBuf...)
 			result = append(result, strBytes...)
-
+		case bool:
+			if v {
+				result = append(result, 1)
+			} else {
+				result = append(result, 0)
+			}
 		default:
 			fmt.Printf("Unsupported operand type: %T\n", v)
 		}
@@ -227,6 +236,7 @@ func serializeOperands(operands []interface{}) []byte {
 }
 
 func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
+	fmt.Printf("Raw Bytecode: %v\n", rawBytecode)
 	var instructions []BytecodeInstruction
 	i := 0
 
@@ -243,6 +253,13 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			numberBytes := rawBytecode[i : i+8]
 			operands = append(operands, numberBytes)
 			i += 8
+		case PUSH_BOOL:
+			if i >= len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+			}
+			boolByte := rawBytecode[i]
+			i++
+			operands = append(operands, boolByte)
 
 		case PUSH_STRING:
 			if i+4 > len(rawBytecode) {
@@ -254,8 +271,8 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+strLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			str := string(rawBytecode[i : i+strLen])
-			operands = append(operands, str)
+			strBytes := rawBytecode[i : i+strLen]
+			operands = append(operands, strBytes)
 			i += strLen
 		case PUSH_VARIABLE:
 			if i+4 > len(rawBytecode) {
@@ -267,10 +284,9 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+varNameLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			varName := string(rawBytecode[i : i+varNameLen])
-			operands = append(operands, varName)
+			varBytes := rawBytecode[i : i+varNameLen]
+			operands = append(operands, varBytes)
 			i += varNameLen
-
 		case DEFINE_VARIABLE:
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
@@ -281,8 +297,8 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+varNameLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			varName := string(rawBytecode[i : i+varNameLen])
-			operands = append(operands, varName)
+			varBytes := rawBytecode[i : i+varNameLen]
+			operands = append(operands, varBytes)
 			i += varNameLen
 
 		default:
