@@ -34,6 +34,7 @@ const (
 	DEFINE_FUNCTION
 	RETURN
 	JUMP
+	CALL_FUNCTION
 )
 
 type BytecodeInstruction struct {
@@ -49,8 +50,9 @@ const (
 )
 
 type Symbol struct {
-	Name string
-	Type SymbolType
+	Name       string
+	Type       SymbolType
+	ParamNames []string
 }
 
 type SymbolTable struct {
@@ -76,10 +78,11 @@ func (st *SymbolTable) DefineVariable(name string) {
 	st.DefineSymbol(name, VariableSymbol)
 }
 
-func (st *SymbolTable) DefineFunction(name string, startAddress int) {
+func (st *SymbolTable) DefineFunction(name string, startAddress int, paramNames []string) {
 	symbol := Symbol{
-		Name: name,
-		Type: FunctionSymbol,
+		Name:       name,
+		Type:       FunctionSymbol,
+		ParamNames: paramNames,
 	}
 	st.Symbols[name] = symbol
 }
@@ -172,7 +175,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 				c.emit(DEFINE_VARIABLE, varName.Value)
 				return nil
 			case "def":
-				// (def funFunction (param) ;do fun func stuff (ret retVal))
+				// (def funFunction (param) ;do fun func stuff (ret optionalReturnValue))
 				if len(n) < 3 {
 					return fmt.Errorf("function definition syntax error")
 				}
@@ -217,6 +220,19 @@ func (c *Compiler) compileNode(node interface{}) error {
 			}
 		}
 
+		if funcNameNode, ok := n[0].(parser.Identifier); ok {
+			symbol, found := c.symbolTable.Resolve(funcNameNode.Value)
+			if found && symbol.Type == FunctionSymbol {
+				for _, arg := range n[1:] {
+					if err := c.compileNode(arg); err != nil {
+						return err
+					}
+				}
+				c.emit(CALL_FUNCTION, funcNameNode.Value)
+				return nil
+			}
+		}
+
 		for _, operand := range n {
 			if _, ok := n[0].(parser.Operator); ok {
 				for _, operand := range n[1:] {
@@ -234,7 +250,6 @@ func (c *Compiler) compileNode(node interface{}) error {
 		}
 
 	case parser.Identifier:
-		//fmt.Printf("Emitting Identifier: %v\n", n.Value)
 		c.emit(PUSH_VARIABLE, n.Value)
 	case parser.Number:
 		c.emit(PUSH_NUMBER, n.Value)
@@ -305,8 +320,10 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 	c.emit(JUMP, jumpIndex)
 
 	c.enterScope()
+	var paramNames []string
 	for _, param := range fnDef.Params {
 		c.symbolTable.DefineVariable(param)
+		paramNames = append(paramNames, param)
 	}
 
 	for _, expr := range fnDef.Body {
@@ -320,9 +337,9 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 	}
 	c.leaveScope()
 
-	c.symbolTable.DefineFunction(fnDef.Name, startAddress)
+	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames)
 	paramCount := len(fnDef.Params)
-	c.emitDefineFunction(fnDef.Name, startAddress, paramCount)
+	c.emitDefineFunction(fnDef.Name, startAddress, paramCount, paramNames)
 
 	return nil
 }
@@ -350,8 +367,8 @@ func (c *Compiler) endsInReturn(body []interface{}) bool {
 	return isRet
 }
 
-func (c *Compiler) emitDefineFunction(funcName string, startAddress, paramCount int) {
-	c.emit(DEFINE_FUNCTION, funcName, startAddress, paramCount)
+func (c *Compiler) emitDefineFunction(funcName string, startAddress, paramCount int, paramNames []string) {
+	c.emit(DEFINE_FUNCTION, funcName, startAddress, paramCount, paramNames)
 }
 
 func (c *Compiler) emit(opcode Opcode, operands ...interface{}) {
@@ -394,6 +411,20 @@ func serializeOperands(operands []interface{}) []byte {
 				result = append(result, 1)
 			} else {
 				result = append(result, 0)
+			}
+		case []string:
+			sliceLenBytes := make([]byte, 4)
+			binary.LittleEndian.PutUint32(sliceLenBytes, uint32(len(v)))
+			result = append(result, sliceLenBytes...)
+
+			fmt.Printf("===serializing params: %v\n", v)
+			for _, str := range v {
+				strBytes := []byte(str)
+				lengthBuf := make([]byte, 4)
+				binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
+				result = append(result, lengthBuf...)
+				result = append(result, strBytes...)
+				fmt.Printf("===serialized param: %v\tlength: %v\tbytes: %v\n", str, lengthBuf, strBytes)
 			}
 		default:
 			fmt.Printf("Unsupported operand type: %T\n", v)
@@ -492,8 +523,56 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			}
 			paramCountBytes := rawBytecode[i : i+4]
 			i += 4
-
 			operands = append(operands, funcNameBytes, startAddressBytes, paramCountBytes)
+			fmt.Printf("===appepnded funcName, startAddress, paramCount: %v\n", operands)
+
+			paramCount := binary.LittleEndian.Uint32(paramCountBytes)
+
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for parameter list length")
+			}
+			paramNamesLenBytes := rawBytecode[i : i+4]
+			paramNamesLen := binary.LittleEndian.Uint32(paramNamesLenBytes)
+			if paramNamesLen != paramCount {
+				return nil, fmt.Errorf("invalid bytecode, parameter list must have the same length as parameter count")
+			}
+			operands = append(operands, paramNamesLenBytes)
+			fmt.Printf("===appended param list len: %v\n", operands)
+			i += 4
+			//var paramNamesBytes []interface{}
+			for j := uint32(0); j < paramCount; j++ {
+
+				if i+4 > len(rawBytecode) {
+					return nil, fmt.Errorf("invalid bytecode, unexpected end of data for parameter name length")
+				}
+				paramNameLenBytes := rawBytecode[i : i+4]
+				paramNameLen := int(binary.LittleEndian.Uint32(paramNameLenBytes))
+				if i+paramNameLen > len(rawBytecode) {
+					return nil, fmt.Errorf("invalid bytecode, unexpected end of data for parameter name")
+				}
+				operands = append(operands, paramNameLenBytes)
+				fmt.Printf("===appended param name len: %v\n", operands)
+				i += 4
+				paramNameBytes := rawBytecode[i : i+paramNameLen]
+				i += paramNameLen
+
+				operands = append(operands, paramNameBytes)
+				fmt.Printf("===appended param name bytes: %v\n", paramNameBytes)
+				fmt.Printf("===after appending param name bytes: %v\n", operands)
+			}
+		case CALL_FUNCTION:
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+			}
+			funcNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+			i += 4
+
+			if i+funcNameLen > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+			}
+			funcNameBytes := rawBytecode[i : i+funcNameLen]
+			operands = append(operands, funcNameBytes)
+			i += funcNameLen
 		case JUMP:
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for JUMP offset")

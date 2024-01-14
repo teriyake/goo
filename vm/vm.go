@@ -34,6 +34,7 @@ func (rst *RuntimeSymbolTable) Get(name string) (interface{}, bool) {
 type FunctionMetadata struct {
 	StartAddress int
 	ParamCount   int
+	ParamNames   []string
 }
 
 type VM struct {
@@ -54,6 +55,19 @@ func NewVM(code []compiler.BytecodeInstruction) *VM {
 		symbolTableStack: []*RuntimeSymbolTable{globalSymbolTable},
 		functions:        make(map[string]FunctionMetadata),
 	}
+}
+
+func (vm *VM) ResolveParamName(funcName string, index int) (string, error) {
+	funcMetadata, exists := vm.functions[funcName]
+	if !exists {
+		return "", fmt.Errorf("function %s not found", funcName)
+	}
+
+	if index < 0 || index >= len(funcMetadata.ParamNames) {
+		return "", fmt.Errorf("parameter index out of range for function %s", funcName)
+	}
+
+	return funcMetadata.ParamNames[index], nil
 }
 
 func (vm *VM) Run() error {
@@ -271,24 +285,78 @@ func (vm *VM) Run() error {
 			if !ok || len(startAddressBytes) != 4 {
 				return fmt.Errorf("Invalid or missing start address in DEFINE_FUNCTION instruction")
 			}
-			startAddress := binary.LittleEndian.Uint32(startAddressBytes)
+			startAddress := int(binary.LittleEndian.Uint32(startAddressBytes)) + 1
 
 			paramCountBytes, ok := instruction.Operands[2].([]byte)
 			if !ok || len(paramCountBytes) != 4 {
 				return fmt.Errorf("Invalid or missing parameter count in DEFINE_FUNCTION instruction")
 			}
-			paramCount := binary.LittleEndian.Uint32(paramCountBytes)
+			paramCount := int(binary.LittleEndian.Uint32(paramCountBytes))
+			var paramNames []string
+			if len(instruction.Operands) > 3 {
+				listLenBytes, ok := instruction.Operands[3].([]byte)
+				if !ok || len(listLenBytes) != 4 {
+					return fmt.Errorf("Invalid or missing length of parameter list in DEFINE_FUNCTION instruction")
+				}
+				listLen := int(binary.LittleEndian.Uint32(listLenBytes))
 
+				for i := 0; i < listLen; i++ {
+					paramNameLenBytes, ok := instruction.Operands[4+i*2].([]byte)
+					if !ok || len(paramNameLenBytes) != 4 {
+						return fmt.Errorf("Invalid or missing length for parameter name in DEFINE_FUNCTION instruction")
+					}
+					paramNameLen := int(binary.LittleEndian.Uint32(paramNameLenBytes))
+
+					paramNameBytes, ok := instruction.Operands[5+i*2].([]byte)
+					if !ok || len(paramNameBytes) != paramNameLen {
+						return fmt.Errorf("Invalid or missing parameter name in DEFINE_FUNCTION instruction")
+					}
+					paramName := string(paramNameBytes)
+					paramNames = append(paramNames, paramName)
+				}
+			}
 			vm.functions[funcName] = FunctionMetadata{
-				StartAddress: int(startAddress),
-				ParamCount:   int(paramCount),
+				StartAddress: startAddress,
+				ParamCount:   paramCount,
+				ParamNames:   paramNames,
 			}
 
-			fmt.Printf("Function %s defined with param count: %v\n", funcName, paramCount)
+			fmt.Printf("Function %s defined with param count: %v and params: %v\n", funcName, paramCount, paramNames)
 			fmt.Printf("Function %s starts at: %v\n", funcName, startAddress)
 
-			vm.pc++
 			fmt.Printf("Current PC: %v\n", vm.pc)
+
+		case compiler.CALL_FUNCTION:
+			funcNameBytes, ok := instruction.Operands[0].([]byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand for CALL_FUNCTION instruction")
+			}
+			funcName := string(funcNameBytes)
+
+			funcMetadata, exists := vm.functions[funcName]
+			if !exists {
+				return fmt.Errorf("Function %s not defined", funcName)
+			}
+
+			newSymbolTable := NewRuntimeSymbolTable(vm.symbolTableStack[len(vm.symbolTableStack)-1])
+			vm.symbolTableStack = append(vm.symbolTableStack, newSymbolTable)
+
+			for i := 0; i < funcMetadata.ParamCount; i++ {
+				if len(vm.stack) < 1 {
+					return fmt.Errorf("Insufficient arguments for function %s", funcName)
+				}
+				argValue := vm.stack[len(vm.stack)-1]
+				vm.stack = vm.stack[:len(vm.stack)-1]
+
+				paramName, err := vm.ResolveParamName(funcName, i)
+				if err != nil {
+					return fmt.Errorf("Error resolving param names: %v\n", err)
+				}
+
+				newSymbolTable.Set(paramName, argValue)
+			}
+
+			vm.pc = funcMetadata.StartAddress
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("JUMP instruction requires an operand")

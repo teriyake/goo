@@ -320,7 +320,7 @@ func (p *Parser) parseFunctionBody() ([]interface{}, error) {
         p.nextToken()
     }
 
-    if !p.expectPeek(lexer.RPAREN) {
+    if p.currentToken.Type != lexer.RPAREN {
         return nil, fmt.Errorf("expected ')' at the end of function body, got %s", p.currentToken.Literal)
     }
 
