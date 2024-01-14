@@ -84,14 +84,14 @@ func (c *Compiler) compileNode(node interface{}) error {
 
 		if identifierNode, ok := n[0].(parser.Identifier); ok {
 			switch identifierNode.Value {
-			case "def":
+			case "let":
 				//fmt.Println("Handling 'def' statement")
 				if len(n) != 3 {
-					return fmt.Errorf("def expects two arguments")
+					return fmt.Errorf("let expects two arguments")
 				}
 				varName, ok := n[1].(parser.Identifier)
 				if !ok {
-					return fmt.Errorf("expected a variable name as the second argument to def")
+					return fmt.Errorf("expected a variable name as the second argument to let")
 				}
 				//fmt.Printf("Variable name for 'def': %s\n", varName.Value)
 
@@ -119,7 +119,6 @@ func (c *Compiler) compileNode(node interface{}) error {
 
 		for _, operand := range n {
 			if _, ok := n[0].(parser.Operator); ok {
-				// Compile all operands first
 				for _, operand := range n[1:] {
 					err := c.compileNode(operand)
 					if err != nil {
@@ -178,9 +177,9 @@ func (c *Compiler) compileNode(node interface{}) error {
 			return err
 		}
 
-		c.emit(ELSE)
 
 		if ifStatement.ElseBlock != nil {
+			c.emit(ELSE)
 			err = c.compileNode(ifStatement.ElseBlock)
 			if err != nil {
 				return err

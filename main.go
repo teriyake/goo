@@ -9,14 +9,15 @@ import (
 )
 
 func main() {
-	gooCode := "(def x 'hi') (if (= x 'hi') (print 'hi') else (print 'bye'))"
+	gooCode := "(let x -2) (if (< x 3) (if (> x 1) (print 'x is greater than 1 and less than 3')) else (if (= x -2) (print 'x equals -2') else (print 'x is greater than 3')))"
+	fmt.Printf("Input: %v\n", gooCode)
 	lexer := lexer.NewLexer(gooCode)
 	par := parser.NewParser(lexer)
 	ast, err := par.Parse()
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	} else {
-		fmt.Printf("%#v\n", ast)
+		fmt.Printf("AST: %#v\n", ast)
 	}
 	comp := compiler.NewCompiler()
 	bytecodeInstructions, err := comp.CompileAST(ast)

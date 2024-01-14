@@ -195,23 +195,23 @@ func (p *Parser) parseIfStatement() (IfStatement, error) {
     ifStmt.ThenBlock = thenBlock
 
     if p.peekTokenIs(lexer.IDENT) && p.peekToken.Literal == "else" {
-        p.nextToken() // consume 'else' token
-
-        if !p.expectPeek(lexer.LPAREN) {
-            return IfStatement{}, fmt.Errorf("expected '(' before else block")
-        }
+        p.nextToken()
 
         p.nextToken()
         elseBlock, err := p.parseExpression()
         if err != nil {
             return IfStatement{}, err
         }
-        ifStmt.ElseBlock = elseBlock
+
+        if elseExpr, ok := elseBlock.([]interface{}); ok {
+            ifStmt.ElseBlock = elseExpr
+        } else {
+            ifStmt.ElseBlock = []interface{}{elseBlock}
+        }
     }
 
     return ifStmt, nil
 }
-
 
 func (p *Parser) expectPeek(t string) bool {
 	if p.peekToken.Type == t || (t == lexer.RPAREN && p.peekToken.Type == lexer.EOF) {

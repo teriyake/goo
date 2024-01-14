@@ -117,32 +117,72 @@ func (vm *VM) Run() error {
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
 			fmt.Printf("Stack after LESS: %v\n", vm.stack)
+
 		case compiler.EQ:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("EQ instruction requires at least 2 values on the stack")
 			}
-			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
-			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("EQ instruction requires float operands")
+
+			operand2 := vm.stack[len(vm.stack)-1]
+			operand1 := vm.stack[len(vm.stack)-2]
+
+			// Check if both operands have the same type
+			if _, ok1 := operand1.(float64); ok1 {
+				// Both operands are floats
+				if _, ok2 := operand2.(float64); ok2 {
+					result := operand1.(float64) == operand2.(float64)
+					vm.stack = vm.stack[:len(vm.stack)-2]
+					vm.stack = append(vm.stack, result)
+					fmt.Printf("Stack after EQ: %v\n", vm.stack)
+				} else {
+					return fmt.Errorf("EQ instruction requires operands of the same type")
+				}
+			} else if _, ok1 := operand1.(string); ok1 {
+				// Both operands are strings
+				if _, ok2 := operand2.(string); ok2 {
+					result := operand1.(string) == operand2.(string)
+					vm.stack = vm.stack[:len(vm.stack)-2]
+					vm.stack = append(vm.stack, result)
+					fmt.Printf("Stack after EQ: %v\n", vm.stack)
+				} else {
+					return fmt.Errorf("EQ instruction requires operands of the same type")
+				}
+			} else {
+				return fmt.Errorf("EQ instruction requires operands of the same type")
 			}
-			result := operand1 == operand2
-			vm.stack = vm.stack[:len(vm.stack)-2]
-			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after EQ: %v\n", vm.stack)
+
 		case compiler.NEQ:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("NEQ instruction requires at least 2 values on the stack")
 			}
-			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
-			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("NEQ instruction requires float operands")
+
+			operand2 := vm.stack[len(vm.stack)-1]
+			operand1 := vm.stack[len(vm.stack)-2]
+
+			// Check if both operands have the same type
+			if _, ok1 := operand1.(float64); ok1 {
+				// Both operands are floats
+				if _, ok2 := operand2.(float64); ok2 {
+					result := operand1.(float64) != operand2.(float64)
+					vm.stack = vm.stack[:len(vm.stack)-2]
+					vm.stack = append(vm.stack, result)
+					fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+				} else {
+					return fmt.Errorf("NEQ instruction requires operands of the same type")
+				}
+			} else if _, ok1 := operand1.(string); ok1 {
+				// Both operands are strings
+				if _, ok2 := operand2.(string); ok2 {
+					result := operand1.(string) != operand2.(string)
+					vm.stack = vm.stack[:len(vm.stack)-2]
+					vm.stack = append(vm.stack, result)
+					fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+				} else {
+					return fmt.Errorf("NEQ instruction requires operands of the same type")
+				}
+			} else {
+				return fmt.Errorf("NEQ instruction requires operands of the same type")
 			}
-			result := operand1 != operand2
-			vm.stack = vm.stack[:len(vm.stack)-2]
-			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after NEQ: %v\n", vm.stack)
 		case compiler.PRINT:
 			if len(vm.stack) < 1 {
 				return fmt.Errorf("PRINT instruction requires a value on the stack")
@@ -188,31 +228,27 @@ func (vm *VM) Run() error {
 			vm.stack = vm.stack[:len(vm.stack)-1]
 
 			if !condition {
-				// Jump to the ELSE or ENDIF
-				for vm.pc < len(vm.code) {
-					nextInstruction := vm.code[vm.pc]
-					if nextInstruction.Opcode == compiler.ELSE || nextInstruction.Opcode == compiler.ENDIF {
-						break
-					}
-					vm.pc++
-				}
+				vm.jumpToOpcode(compiler.ELSE)
 			}
 		case compiler.ELSE:
-			// Skip the "else" block by jumping to the ENDIF
-			for vm.pc < len(vm.code) {
-				nextInstruction := vm.code[vm.pc]
-				if nextInstruction.Opcode == compiler.ENDIF {
-					break
-				}
-				vm.pc++
-			}
+			vm.jumpToOpcode(compiler.ENDIF)
 
 		case compiler.ENDIF:
-			// No action needed for ENDIF
+
 		default:
 			return fmt.Errorf("Unknown instruction: %v", instruction.Opcode)
 		}
 	}
 
 	return nil
+}
+
+func (vm *VM) jumpToOpcode(opcode compiler.Opcode) {
+    for vm.pc < len(vm.code) {
+        if vm.code[vm.pc].Opcode == opcode {
+			vm.pc++
+            break
+        }
+        vm.pc++
+    }
 }
