@@ -85,19 +85,40 @@ func (p *Parser) parseExpression() (interface{}, error) {
 	case lexer.OPERATOR:
 		operator := Operator{Value: p.currentToken.Literal}
 		p.nextToken()
-		firstOperand, err := p.parseExpression()
+
+		var operands []interface{}
+		firstOperand, err := p.parseOperand()
 		if err != nil {
 			return nil, err
 		}
+		operands = append(operands, firstOperand)
 
+		if !p.peekTokenIs(lexer.RPAREN) && p.peekToken.Type != lexer.EOF {
+			p.nextToken()
+			secondOperand, err := p.parseOperand()
+			if err != nil {
+				return nil, err
+			}
+			operands = append(operands, secondOperand)
+		}
+
+		result = append([]interface{}{operator}, operands...)
+    case lexer.LPAREN:
+        p.nextToken()
+        return p.parseParenExpression()
+	case lexer.RPAREN:
 		p.nextToken()
-		secondOperand, err := p.parseExpression()
-		if err != nil {
-			return nil, err
-		}
+		return nil, nil
+	default:
+		err = fmt.Errorf("Unexpected token: %s", p.currentToken.Literal)
+	}
 
-		result = []interface{}{operator, firstOperand, secondOperand}
-	case lexer.LPAREN:
+	//fmt.Printf("parseExpression - End, Parsed: %+v\n", result)
+	return result, err
+}
+
+func (p *Parser) parseOperand() (interface{}, error) {
+	if p.currentToken.Type == lexer.LPAREN {
 		p.nextToken()
 		var nestedExpressions []interface{}
 		for p.currentToken.Type != lexer.RPAREN && p.currentToken.Type != lexer.EOF {
@@ -112,61 +133,85 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			p.nextToken()
 		}
 
-		if !p.expectPeek(lexer.RPAREN) {
-			return nil, fmt.Errorf("expected ')' after expression")
+		if p.currentToken.Type != lexer.RPAREN {
+			return nil, fmt.Errorf("expected ')' after nested expression, got %s", p.currentToken.Literal)
 		}
 
-		if len(nestedExpressions) == 1 {
-			result = nestedExpressions[0]
-		} else {
-			result = nestedExpressions
-		}
-
-		p.nextToken()
-	case lexer.RPAREN:
-		p.nextToken()
-		return nil, nil
-	default:
-		err = fmt.Errorf("Unexpected token: %s", p.currentToken.Literal)
+		return nestedExpressions, nil
+	} else {
+		return p.parseExpression()
 	}
+}
 
-	//fmt.Printf("parseExpression - End, Parsed: %+v\n", result)
-	return result, err
+func (p *Parser) parseParenExpression() (interface{}, error) {
+    var expressions []interface{}
+
+    for p.currentToken.Type != lexer.RPAREN && p.currentToken.Type != lexer.EOF {
+        expr, err := p.parseExpression()
+        if err != nil {
+            return nil, err
+        }
+        expressions = append(expressions, expr)
+
+        if p.peekToken.Type == lexer.RPAREN {
+            break
+        }
+        p.nextToken()
+    }
+
+    if !p.expectPeek(lexer.RPAREN) {
+        return nil, fmt.Errorf("expected ')' after expression, got %s", p.currentToken.Literal)
+    }
+
+    if len(expressions) == 1 {
+        return expressions[0], nil
+    }
+    return expressions, nil
 }
 
 func (p *Parser) parseIfStatement() (IfStatement, error) {
-	//fmt.Println("parseIfStatement - Start")
-	var ifStmt IfStatement
+    var ifStmt IfStatement
 
-	if !p.expectPeek(lexer.LPAREN) {
-		return IfStatement{}, fmt.Errorf("expected '(' after 'if'")
-	}
+    if !p.expectPeek(lexer.LPAREN) {
+        return IfStatement{}, fmt.Errorf("expected '(' after 'if'")
+    }
 
-	p.nextToken()
-	condition, err := p.parseExpression()
-	if err != nil {
-		return IfStatement{}, err
-	}
-	ifStmt.Condition = condition
+    p.nextToken()
+    condition, err := p.parseExpression()
+    if err != nil {
+        return IfStatement{}, err
+    }
+    ifStmt.Condition = condition
 
-	if !p.expectPeek(lexer.RPAREN) {
-		return IfStatement{}, fmt.Errorf("expected ')' after if condition")
-	}
+    if !p.expectPeek(lexer.RPAREN) {
+        return IfStatement{}, fmt.Errorf("expected ')' after if condition")
+    }
 
-	p.nextToken()
-	thenBlock, err := p.parseExpression()
-	if err != nil {
-		return IfStatement{}, err
-	}
-	ifStmt.ThenBlock = []interface{}{thenBlock}
+    p.nextToken()
+    thenBlock, err := p.parseExpression()
+    if err != nil {
+        return IfStatement{}, err
+    }
+    ifStmt.ThenBlock = thenBlock
 
-	if !p.expectPeek(lexer.RPAREN) {
-		return IfStatement{}, fmt.Errorf("expected ')' at the end of the if statement")
-	}
+    if p.peekTokenIs(lexer.IDENT) && p.peekToken.Literal == "else" {
+        p.nextToken() // consume 'else' token
 
-	//fmt.Println("parseIfStatement - End")
-	return ifStmt, nil
+        if !p.expectPeek(lexer.LPAREN) {
+            return IfStatement{}, fmt.Errorf("expected '(' before else block")
+        }
+
+        p.nextToken()
+        elseBlock, err := p.parseExpression()
+        if err != nil {
+            return IfStatement{}, err
+        }
+        ifStmt.ElseBlock = elseBlock
+    }
+
+    return ifStmt, nil
 }
+
 
 func (p *Parser) expectPeek(t string) bool {
 	if p.peekToken.Type == t || (t == lexer.RPAREN && p.peekToken.Type == lexer.EOF) {
@@ -191,8 +236,10 @@ func (p *Parser) Parse() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		ast = append(ast, expression)
 
+		if expression != nil {
+			ast = append(ast, expression)
+		}
 		//fmt.Printf("Parsed expression: %v\n", expression)
 		p.nextToken()
 	}

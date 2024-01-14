@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	gooCode := "(def abcde (? 2 2))"
+	gooCode := "(def x 'hi') (if (= x 'hi') (print 'hi') else (print 'bye'))"
 	lexer := lexer.NewLexer(gooCode)
 	par := parser.NewParser(lexer)
 	ast, err := par.Parse()
