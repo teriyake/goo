@@ -316,8 +316,9 @@ func (c *Compiler) compileNode(node interface{}) error {
 func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) error {
 	startAddress := len(c.bytecode)
 
-	jumpIndex := len(fnDef.Body) + 2 // also has to jump over JUMP and RETURN
-	c.emit(JUMP, jumpIndex)
+	//jumpIndex := len(fnDef.Body) + 2 // also has to jump over JUMP and RETURN
+	placeholderJumpIndex := len(c.bytecode)
+	c.emit(JUMP, 0) // Placeholder offset
 
 	c.enterScope()
 	var paramNames []string
@@ -326,16 +327,21 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 		paramNames = append(paramNames, param)
 	}
 
+	instructionCountBeforeBody := len(c.bytecode)
 	for _, expr := range fnDef.Body {
 		if err := c.compileNode(expr); err != nil {
 			return err
 		}
 	}
+	instructionCountAfterBody := len(c.bytecode)
 
 	if !c.endsInReturn(fnDef.Body) {
 		c.emit(RETURN)
 	}
 	c.leaveScope()
+
+	jumpOffset := instructionCountAfterBody - instructionCountBeforeBody
+	updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
 
 	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames)
 	paramCount := len(fnDef.Params)
@@ -417,14 +423,14 @@ func serializeOperands(operands []interface{}) []byte {
 			binary.LittleEndian.PutUint32(sliceLenBytes, uint32(len(v)))
 			result = append(result, sliceLenBytes...)
 
-			fmt.Printf("===serializing params: %v\n", v)
+			//fmt.Printf("===serializing params: %v\n", v)
 			for _, str := range v {
 				strBytes := []byte(str)
 				lengthBuf := make([]byte, 4)
 				binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
 				result = append(result, lengthBuf...)
 				result = append(result, strBytes...)
-				fmt.Printf("===serialized param: %v\tlength: %v\tbytes: %v\n", str, lengthBuf, strBytes)
+				//fmt.Printf("===serialized param: %v\tlength: %v\tbytes: %v\n", str, lengthBuf, strBytes)
 			}
 		default:
 			fmt.Printf("Unsupported operand type: %T\n", v)
@@ -432,6 +438,28 @@ func serializeOperands(operands []interface{}) []byte {
 	}
 
 	return result
+}
+
+func calculateCorrectedOffset(bytecode []byte, offset int) int {
+	count := 0
+	for i := 0; i < offset && i < len(bytecode); {
+		opcode := Opcode(bytecode[i])
+		i++
+		switch opcode {
+		case PUSH_NUMBER:
+			i += 8 
+		case PUSH_BOOL, PUSH_VARIABLE, DEFINE_VARIABLE:
+			if i+4 > len(bytecode) {
+				break
+			}
+			operandLength := int(binary.LittleEndian.Uint32(bytecode[i : i+4]))
+			i += 4 + operandLength
+			// ... other cases ...
+		}
+		count++ 
+	}
+	count++
+	return count
 }
 
 func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
@@ -524,7 +552,7 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			paramCountBytes := rawBytecode[i : i+4]
 			i += 4
 			operands = append(operands, funcNameBytes, startAddressBytes, paramCountBytes)
-			fmt.Printf("===appepnded funcName, startAddress, paramCount: %v\n", operands)
+			//fmt.Printf("===appepnded funcName, startAddress, paramCount: %v\n", operands)
 
 			paramCount := binary.LittleEndian.Uint32(paramCountBytes)
 
@@ -537,7 +565,7 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 				return nil, fmt.Errorf("invalid bytecode, parameter list must have the same length as parameter count")
 			}
 			operands = append(operands, paramNamesLenBytes)
-			fmt.Printf("===appended param list len: %v\n", operands)
+			//fmt.Printf("===appended param list len: %v\n", operands)
 			i += 4
 			//var paramNamesBytes []interface{}
 			for j := uint32(0); j < paramCount; j++ {
@@ -551,14 +579,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 					return nil, fmt.Errorf("invalid bytecode, unexpected end of data for parameter name")
 				}
 				operands = append(operands, paramNameLenBytes)
-				fmt.Printf("===appended param name len: %v\n", operands)
+				//fmt.Printf("===appended param name len: %v\n", operands)
 				i += 4
 				paramNameBytes := rawBytecode[i : i+paramNameLen]
 				i += paramNameLen
 
 				operands = append(operands, paramNameBytes)
-				fmt.Printf("===appended param name bytes: %v\n", paramNameBytes)
-				fmt.Printf("===after appending param name bytes: %v\n", operands)
+				//fmt.Printf("===appended param name bytes: %v\n", paramNameBytes)
+				//fmt.Printf("===after appending param name bytes: %v\n", operands)
 			}
 		case CALL_FUNCTION:
 			if i+4 > len(rawBytecode) {
@@ -579,7 +607,11 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			}
 			jumpOffsetBytes := rawBytecode[i : i+4]
 			i += 4
-			operands = append(operands, jumpOffsetBytes)
+			jumpOffset := int(binary.LittleEndian.Uint32(jumpOffsetBytes))
+			correctedOffset := calculateCorrectedOffset(rawBytecode[i:], jumpOffset)
+			offsetBytes := make([]byte, 4)
+			binary.LittleEndian.PutUint32(offsetBytes, uint32(correctedOffset))
+			operands = append(operands, offsetBytes)
 
 		default:
 			// Opcodes without operands

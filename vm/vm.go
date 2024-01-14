@@ -37,6 +37,11 @@ type FunctionMetadata struct {
 	ParamNames   []string
 }
 
+type CallStackEntry struct {
+	returnAddress int
+	symbolTable   *RuntimeSymbolTable
+}
+
 type VM struct {
 	stack []interface{}
 	pc    int
@@ -44,16 +49,18 @@ type VM struct {
 	//symbolTable map[string]interface{}
 	symbolTableStack []*RuntimeSymbolTable
 	functions        map[string]FunctionMetadata
+	callStack        []CallStackEntry
 }
 
 func NewVM(code []compiler.BytecodeInstruction) *VM {
-	globalSymbolTable := NewRuntimeSymbolTable(nil) // Global scope
+	globalSymbolTable := NewRuntimeSymbolTable(nil)
 	return &VM{
 		stack:            make([]interface{}, 0),
 		pc:               0,
 		code:             code,
 		symbolTableStack: []*RuntimeSymbolTable{globalSymbolTable},
 		functions:        make(map[string]FunctionMetadata),
+		callStack:        make([]CallStackEntry, 0),
 	}
 }
 
@@ -333,30 +340,45 @@ func (vm *VM) Run() error {
 			}
 			funcName := string(funcNameBytes)
 
-			funcMetadata, exists := vm.functions[funcName]
-			if !exists {
+			functionMetadata, ok := vm.functions[funcName]
+			if !ok {
 				return fmt.Errorf("Function %s not defined", funcName)
 			}
+
+			vm.callStack = append(vm.callStack, CallStackEntry{
+				returnAddress: vm.pc,
+				symbolTable:   vm.symbolTableStack[len(vm.symbolTableStack)-1],
+			})
+
+			vm.pc = functionMetadata.StartAddress
 
 			newSymbolTable := NewRuntimeSymbolTable(vm.symbolTableStack[len(vm.symbolTableStack)-1])
 			vm.symbolTableStack = append(vm.symbolTableStack, newSymbolTable)
 
-			for i := 0; i < funcMetadata.ParamCount; i++ {
-				if len(vm.stack) < 1 {
-					return fmt.Errorf("Insufficient arguments for function %s", funcName)
+			for i, paramName := range functionMetadata.ParamNames {
+				if len(vm.stack) < len(functionMetadata.ParamNames)-i {
+					return fmt.Errorf("Not enough arguments for function %s", funcName)
 				}
-				argValue := vm.stack[len(vm.stack)-1]
-				vm.stack = vm.stack[:len(vm.stack)-1]
-
-				paramName, err := vm.ResolveParamName(funcName, i)
-				if err != nil {
-					return fmt.Errorf("Error resolving param names: %v\n", err)
-				}
-
-				newSymbolTable.Set(paramName, argValue)
+				paramValue := vm.stack[len(vm.stack)-len(functionMetadata.ParamNames)+i]
+				newSymbolTable.Set(paramName, paramValue)
 			}
 
-			vm.pc = funcMetadata.StartAddress
+			vm.stack = vm.stack[:len(vm.stack)-len(functionMetadata.ParamNames)]
+
+			continue
+		case compiler.RETURN:
+			if len(vm.callStack) == 0 {
+				return fmt.Errorf("Call stack is empty on return")
+			}
+
+			callStackEntry := vm.callStack[len(vm.callStack)-1]
+			vm.callStack = vm.callStack[:len(vm.callStack)-1]
+
+			vm.pc = callStackEntry.returnAddress
+			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]        
+			vm.symbolTableStack = append(vm.symbolTableStack, callStackEntry.symbolTable)
+
+			continue
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("JUMP instruction requires an operand")

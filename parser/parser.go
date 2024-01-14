@@ -308,6 +308,61 @@ func (p *Parser) parseFunctionParameters() ([]string, error) {
 func (p *Parser) parseFunctionBody() ([]interface{}, error) {
     var body []interface{}
 
+    // Instead of expecting an opening '(', start parsing expressions immediately
+    for !p.currentTokenIs(lexer.RPAREN) && !p.currentTokenIs(lexer.EOF) {
+        expr, err := p.parseExpression()
+        if err != nil {
+            return nil, err
+        }
+
+        if expr != nil {
+            body = append(body, expr)
+        }
+
+        if !p.peekTokenIs(lexer.RPAREN) {
+            p.nextToken()
+        }
+    }
+
+    if !p.currentTokenIs(lexer.RPAREN) {
+        return nil, fmt.Errorf("expected ')' at the end of function body, got %s", p.currentToken.Literal)
+    }
+
+    return body, nil
+}
+
+func (p *Parser) currentTokenIs(t string) bool {
+    return p.currentToken.Type == t
+}
+
+func (p *Parser) parseFunctionBody3() ([]interface{}, error) {
+    var body []interface{}
+
+    for !p.peekTokenIs(lexer.RPAREN) && p.peekToken.Type != lexer.EOF {
+        p.nextToken()
+
+        expr, err := p.parseExpression()
+        if err != nil {
+            return nil, err
+        }
+
+        body = append(body, expr)
+
+        if p.peekTokenIs(lexer.RPAREN) {
+            break
+        }
+    }
+
+    if !p.expectPeek(lexer.RPAREN) {
+        return nil, fmt.Errorf("expected ')' at the end of function definition, got %s", p.peekToken.Literal)
+    }
+
+    return body, nil
+}
+
+func (p *Parser) parseFunctionBody2() ([]interface{}, error) {
+    var body []interface{}
+
     p.nextToken()
 
     for p.currentToken.Type != lexer.RPAREN && p.currentToken.Type != lexer.EOF {
