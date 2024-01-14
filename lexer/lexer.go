@@ -19,7 +19,9 @@ const (
 	BOOL       = "BOOL"
 	STRING     = "STRING"
 	OPERATOR   = "OPERATOR"
+	SPACE      = "SPACE"
 	WHITESPACE = "WHITESPACE"
+	COMMA      = "COMMA"
 	COMMENT    = "COMMENT"
 	EOF        = "EOF"
 	ILLEGAL    = "ILLEGAL"
@@ -32,10 +34,12 @@ var tokenTypes = []struct {
 	{LPAREN, `^\(`},
 	{RPAREN, `^\)`},
 	{BOOL, `^true|^false`},
+	{COMMA, `^,`},
 	{IDENT, `^[a-zA-Z_][a-zA-Z0-9_]*`},
 	{NUMBER, `^-?\d+(\.\d+)?`},
 	{STRING, `^'[^']*'`},
 	{OPERATOR, `^[-><=+?]+`},
+	{SPACE, `^\s`},
 	{WHITESPACE, `^\s+`},
 	{COMMENT, `^;[^\n]*`},
 }

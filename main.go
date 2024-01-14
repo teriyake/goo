@@ -9,7 +9,9 @@ import (
 )
 
 func main() {
-	gooCode := "(let x -2) (if (< x 3) (if (> x 1) (print 'x is greater than 1 and less than 3')) else (if (= x -2) (print 'x equals -2') else (print 'x is greater than 3')))"
+	//gooCode := "(let x -2) (if (< x 3) (if (> x 1) (print 'x is greater than 1 and less than 3')) else (if (= x -2) (print 'x equals -2') else (print 'x is greater than 3')))"
+	gooCode := "(def hello (n) (print n))"
+	//gooCode := "(let x 10) (let x 11)"
 	fmt.Printf("Input: %v\n", gooCode)
 	lexer := lexer.NewLexer(gooCode)
 	par := parser.NewParser(lexer)
