@@ -305,6 +305,13 @@ func (c *Compiler) compileNode(node interface{}) error {
 		return nil
 	case parser.FunctionDefinition:
 		return c.compileFunctionDefinition(n)
+	case parser.ReturnStatement:
+		err := c.compileNode(n.ReturnValue)
+		if err != nil {
+			return err
+		}
+		c.emit(RETURN)
+		return nil
 	default:
 		return fmt.Errorf("unknown node type: %T", n)
 	}
@@ -327,21 +334,24 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 		paramNames = append(paramNames, param)
 	}
 
-	instructionCountBeforeBody := len(c.bytecode)
+	//instructionCountBeforeBody := len(c.bytecode)
 	for _, expr := range fnDef.Body {
 		if err := c.compileNode(expr); err != nil {
 			return err
 		}
 	}
-	instructionCountAfterBody := len(c.bytecode)
+	//instructionCountAfterBody := len(c.bytecode)
 
 	if !c.endsInReturn(fnDef.Body) {
 		c.emit(RETURN)
 	}
+
+	jumpOffset := len(c.bytecode) - startAddress
+	updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
 	c.leaveScope()
 
-	jumpOffset := instructionCountAfterBody - instructionCountBeforeBody
-	updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
+	//jumpOffset := instructionCountAfterBody - instructionCountBeforeBody
+	//updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
 
 	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames)
 	paramCount := len(fnDef.Params)
@@ -389,27 +399,20 @@ func serializeOperands(operands []interface{}) []byte {
 	var result []byte
 
 	for _, operand := range operands {
-		//fmt.Printf("Serializing Operand: %v, Type: %T\n", operand, operand)
-
 		switch v := operand.(type) {
 		case int:
 			intBytes := make([]byte, 4)
 			binary.LittleEndian.PutUint32(intBytes, uint32(v))
 			result = append(result, intBytes...)
 		case float64:
-			//fmt.Printf("Serializing floating-point number:%v\n", operand)
 			bits := math.Float64bits(v)
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, bits)
 			result = append(result, buf...)
-			//fmt.Printf("converted bytes:%v\n", result)
 		case string:
-			//fmt.Printf("Serializing string operand: %s\n", v)
 			strBytes := []byte(v)
 			lengthBuf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
-			//fmt.Println(lengthBuf)
-			//fmt.Println(strBytes)
 			result = append(result, lengthBuf...)
 			result = append(result, strBytes...)
 		case bool:
@@ -423,14 +426,12 @@ func serializeOperands(operands []interface{}) []byte {
 			binary.LittleEndian.PutUint32(sliceLenBytes, uint32(len(v)))
 			result = append(result, sliceLenBytes...)
 
-			//fmt.Printf("===serializing params: %v\n", v)
 			for _, str := range v {
 				strBytes := []byte(str)
 				lengthBuf := make([]byte, 4)
 				binary.LittleEndian.PutUint32(lengthBuf, uint32(len(strBytes)))
 				result = append(result, lengthBuf...)
 				result = append(result, strBytes...)
-				//fmt.Printf("===serialized param: %v\tlength: %v\tbytes: %v\n", str, lengthBuf, strBytes)
 			}
 		default:
 			fmt.Printf("Unsupported operand type: %T\n", v)
@@ -442,23 +443,27 @@ func serializeOperands(operands []interface{}) []byte {
 
 func calculateCorrectedOffset(bytecode []byte, offset int) int {
 	count := 0
+	offset -= 5
 	for i := 0; i < offset && i < len(bytecode); {
 		opcode := Opcode(bytecode[i])
 		i++
+
 		switch opcode {
 		case PUSH_NUMBER:
-			i += 8 
-		case PUSH_BOOL, PUSH_VARIABLE, DEFINE_VARIABLE:
+			i += 8
+		case PUSH_STRING, PUSH_BOOL, PUSH_VARIABLE, DEFINE_VARIABLE:
 			if i+4 > len(bytecode) {
 				break
 			}
 			operandLength := int(binary.LittleEndian.Uint32(bytecode[i : i+4]))
 			i += 4 + operandLength
+		case JUMP:
+			i += 4
 			// ... other cases ...
 		}
-		count++ 
+
+		count++
 	}
-	count++
 	return count
 }
 

@@ -33,13 +33,13 @@ type IfStatement struct {
 }
 
 type FunctionDefinition struct {
-    Name   string
-    Params []string
-    Body   []interface{}
+	Name   string
+	Params []string
+	Body   []interface{}
 }
 
 type ReturnStatement struct {
-    ReturnValue interface{}
+	ReturnValue interface{}
 }
 
 type Parser struct {
@@ -74,6 +74,8 @@ func (p *Parser) parseExpression() (interface{}, error) {
 	case lexer.IDENT:
 		if p.currentToken.Literal == "if" {
 			result, err = p.parseIfStatement()
+		} else if p.currentToken.Literal == "ret" {
+			result, err = p.parseReturnStatement()
 		} else {
 			result = Identifier{Value: p.currentToken.Literal}
 		}
@@ -241,156 +243,111 @@ func (p *Parser) peekTokenIs(t string) bool {
 }
 
 func (p *Parser) parseFunctionDefinition() (interface{}, error) {
-    p.nextToken()
+	p.nextToken()
 
-    if p.currentToken.Type != lexer.IDENT {
-        return nil, fmt.Errorf("expected function name, got %s", p.currentToken.Literal)
-    }
-    functionName := p.currentToken.Literal
+	if p.currentToken.Type != lexer.IDENT {
+		return nil, fmt.Errorf("expected function name, got %s", p.currentToken.Literal)
+	}
+	functionName := p.currentToken.Literal
 
+	if !p.expectPeek(lexer.LPAREN) {
+		return nil, fmt.Errorf("expected '(' before function parameters, got %s", p.peekToken.Literal)
+	}
 
-    if !p.expectPeek(lexer.LPAREN) {
-        return nil, fmt.Errorf("expected '(' before function parameters, got %s", p.peekToken.Literal)
-    }
+	params, err := p.parseFunctionParameters()
+	if err != nil {
+		return nil, err
+	}
 
-    params, err := p.parseFunctionParameters()
-    if err != nil {
-        return nil, err
-    }
-
-    if p.currentToken.Type != lexer.LPAREN {
-        return nil, fmt.Errorf("expected '(' before function body, got %s", p.peekToken.Literal)
-    }
+	if p.currentToken.Type != lexer.LPAREN {
+		return nil, fmt.Errorf("expected '(' before function body, got %s", p.peekToken.Literal)
+	}
 
 	body, err := p.parseFunctionBody()
-    if err != nil {
-        return FunctionDefinition{}, err
-    }
+	if err != nil {
+		return FunctionDefinition{}, err
+	}
 
-    return FunctionDefinition{
-        Name:     functionName,
-        Params:   params,
-        Body:     body,
-    }, nil
+	return FunctionDefinition{
+		Name:   functionName,
+		Params: params,
+		Body:   body,
+	}, nil
 }
 
 func (p *Parser) parseFunctionParameters() ([]string, error) {
-    var params []string
+	var params []string
 
-    p.nextToken()
+	p.nextToken()
 
-    for p.currentToken.Type != lexer.RPAREN {
-        if p.currentToken.Type == lexer.EOF {
-            return nil, fmt.Errorf("unexpected end of file while parsing function parameters")
-        }
+	for p.currentToken.Type != lexer.RPAREN {
+		if p.currentToken.Type == lexer.EOF {
+			return nil, fmt.Errorf("unexpected end of file while parsing function parameters")
+		}
 
-        if p.currentToken.Type != lexer.IDENT {
-            return nil, fmt.Errorf("expected parameter name, got %s", p.currentToken.Literal)
-        }
+		if p.currentToken.Type != lexer.IDENT {
+			return nil, fmt.Errorf("expected parameter name, got %s", p.currentToken.Literal)
+		}
 
-        params = append(params, p.currentToken.Literal)
+		params = append(params, p.currentToken.Literal)
 
-        p.nextToken()
+		p.nextToken()
 
-        if p.currentToken.Type == lexer.COMMA {
-            p.nextToken()
-        }
-    }
+		if p.currentToken.Type == lexer.COMMA {
+			p.nextToken()
+		}
+	}
 
-    if p.currentToken.Type != lexer.RPAREN {
-        return nil, fmt.Errorf("expected ')' after function parameters, got %s", p.currentToken.Literal)
-    }
-    p.nextToken() 
+	if p.currentToken.Type != lexer.RPAREN {
+		return nil, fmt.Errorf("expected ')' after function parameters, got %s", p.currentToken.Literal)
+	}
+	p.nextToken()
 
-    return params, nil
+	return params, nil
 }
 
 func (p *Parser) parseFunctionBody() ([]interface{}, error) {
-    var body []interface{}
+	var body []interface{}
 
-    // Instead of expecting an opening '(', start parsing expressions immediately
-    for !p.currentTokenIs(lexer.RPAREN) && !p.currentTokenIs(lexer.EOF) {
-        expr, err := p.parseExpression()
-        if err != nil {
-            return nil, err
-        }
+	for !p.currentTokenIs(lexer.RPAREN) && !p.currentTokenIs(lexer.EOF) {
+		expr, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
 
-        if expr != nil {
-            body = append(body, expr)
-        }
+		if expr != nil {
+			body = append(body, expr)
+		}
 
-        if !p.peekTokenIs(lexer.RPAREN) {
-            p.nextToken()
-        }
-    }
+		if !p.peekTokenIs(lexer.RPAREN) {
+			p.nextToken()
+		}
+	}
 
-    if !p.currentTokenIs(lexer.RPAREN) {
-        return nil, fmt.Errorf("expected ')' at the end of function body, got %s", p.currentToken.Literal)
-    }
+	if !p.currentTokenIs(lexer.RPAREN) {
+		return nil, fmt.Errorf("expected ')' at the end of function body, got %s", p.currentToken.Literal)
+	}
 
-    return body, nil
+	return body, nil
 }
 
 func (p *Parser) currentTokenIs(t string) bool {
-    return p.currentToken.Type == t
-}
-
-func (p *Parser) parseFunctionBody3() ([]interface{}, error) {
-    var body []interface{}
-
-    for !p.peekTokenIs(lexer.RPAREN) && p.peekToken.Type != lexer.EOF {
-        p.nextToken()
-
-        expr, err := p.parseExpression()
-        if err != nil {
-            return nil, err
-        }
-
-        body = append(body, expr)
-
-        if p.peekTokenIs(lexer.RPAREN) {
-            break
-        }
-    }
-
-    if !p.expectPeek(lexer.RPAREN) {
-        return nil, fmt.Errorf("expected ')' at the end of function definition, got %s", p.peekToken.Literal)
-    }
-
-    return body, nil
-}
-
-func (p *Parser) parseFunctionBody2() ([]interface{}, error) {
-    var body []interface{}
-
-    p.nextToken()
-
-    for p.currentToken.Type != lexer.RPAREN && p.currentToken.Type != lexer.EOF {
-        expr, err := p.parseParenExpression()
-        if err != nil {
-            return nil, err
-        }
-        body = append(body, expr)
-
-        p.nextToken()
-    }
-
-    if p.currentToken.Type != lexer.RPAREN {
-        return nil, fmt.Errorf("expected ')' at the end of function body, got %s", p.currentToken.Literal)
-    }
-
-    return body, nil
+	return p.currentToken.Type == t
 }
 
 func (p *Parser) parseReturnStatement() (ReturnStatement, error) {
-    p.nextToken()
+	var ret []interface{}
+	p.nextToken()
 
-    returnValue, err := p.parseExpression()
-    if err != nil {
-        return ReturnStatement{}, err
-    }
+	returnValue, err := p.parseExpression()
+	if err != nil {
+		return ReturnStatement{}, err
+	}
+	if returnValue != nil {
+		ret = append(ret, returnValue)
+	}
 
-    return ReturnStatement{ReturnValue: returnValue}, nil
+	return ReturnStatement{ReturnValue: ret}, nil
 }
 
 func (p *Parser) Parse() (interface{}, error) {

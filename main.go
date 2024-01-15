@@ -10,8 +10,8 @@ import (
 
 func main() {
 	//gooCode := "(let x -2) (if (< x 3) (if (> x 1) (print 'x is greater than 1 and less than 3')) else (if (= x -2) (print 'x equals -2') else (print 'x is greater than 3')))"
-	//gooCode := "(def hello (a b) (print a) (print b)) (hello 2 4)"
-	gooCode := "(def hello (a b) (print a) (print a) (print b)) (hello 2 4)"
+	gooCode := "(def hello (a b) (print a) (print b) (print 'hi') (print '123') (print 123)) (hello 2 4)"
+	//gooCode := "(def add_num (a b) (ret (+ a b))) (add_num 3 5)"
 	//gooCode := "(let x 10) (let x 11)"
 	fmt.Printf("Input: %v\n", gooCode)
 	lexer := lexer.NewLexer(gooCode)

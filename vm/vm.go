@@ -77,6 +77,23 @@ func (vm *VM) ResolveParamName(funcName string, index int) (string, error) {
 	return funcMetadata.ParamNames[index], nil
 }
 
+func (vm *VM) push(value interface{}) {
+	vm.stack = append(vm.stack, value)
+}
+
+func (vm *VM) pop() (interface{}, error) {
+	if len(vm.stack) == 0 {
+		return nil, fmt.Errorf("stack underflow: cannot pop from an empty stack")
+	}
+
+	topIndex := len(vm.stack) - 1
+	topElement := vm.stack[topIndex]
+
+	vm.stack = vm.stack[:topIndex]
+
+	return topElement, nil
+}
+
 func (vm *VM) Run() error {
 	for vm.pc < len(vm.code) {
 		instruction := vm.code[vm.pc]
@@ -371,12 +388,19 @@ func (vm *VM) Run() error {
 				return fmt.Errorf("Call stack is empty on return")
 			}
 
+			returnValue, err := vm.pop()
+			if err != nil {
+				return fmt.Errorf("No return value found on the stack")
+			}
+
 			callStackEntry := vm.callStack[len(vm.callStack)-1]
 			vm.callStack = vm.callStack[:len(vm.callStack)-1]
 
 			vm.pc = callStackEntry.returnAddress
-			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]        
+			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
 			vm.symbolTableStack = append(vm.symbolTableStack, callStackEntry.symbolTable)
+
+			vm.push(returnValue)
 
 			continue
 		case compiler.JUMP:
