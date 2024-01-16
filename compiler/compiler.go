@@ -8,11 +8,6 @@ import (
 	"teriyake/goo/parser"
 )
 
-type Instruction struct {
-	Opcode   Opcode
-	Operands []int
-}
-
 type Opcode int
 
 const (
@@ -38,6 +33,34 @@ const (
 	JUMP
 	CALL_FUNCTION
 )
+
+func OpcodeToString(op Opcode) string {
+	opcodeStrings := map[Opcode]string{
+		ADD:            "ADD",
+		SUB:            "SUB",
+		MUL:            "MUL",
+		DIV:            "DIV",
+		GRT:            "GRT",
+		LESS:           "LESS",
+		EQ:             "EQ",
+		NEQ:            "NEQ",
+		PUSH_VARIABLE:  "PUSH_VARIABLE",
+		PUSH_NUMBER:    "PUSH_NUMBER",
+		PUSH_BOOL:      "PUSH_BOOL",
+		PUSH_STRING:    "PUSH_STRING",
+		DEFINE_VARIABLE: "DEFINE_VARIABLE",
+		DEFINE_FUNCTION: "DEFINE_FUNCTION",
+		IF:             "IF",
+		ELSE:           "ELSE",
+		ENDIF:          "ENDIF",
+		PRINT:          "PRINT",
+		RETURN:         "RETURN",
+		JUMP:           "JUMP",
+		CALL_FUNCTION:  "CALL_FUNCTION",
+	}
+
+	return opcodeStrings[op]
+}
 
 type BytecodeInstruction struct {
 	Opcode   Opcode
@@ -236,26 +259,29 @@ func (c *Compiler) compileNode(node interface{}) error {
 			return fmt.Errorf("empty expression")
 		}
 
+		if varNode, ok := n[0].(parser.TypeAnnotation); ok {
+
+			if len(n) != 2 {
+				return fmt.Errorf("let expects two arguments")
+			}
+			varName := varNode.Variable
+			varType := varNode.Type
+
+			err := c.compileNode(n[1])
+			if err != nil {
+				return err
+			}
+
+			c.symbolTable.DefineVariable(varName, ParseDataType(varType))
+
+			c.symbolTable.Print()
+			//fmt.Printf("Emitting DEFINE_VARIABLE for %s\n", varName.Value)
+			c.emit(DEFINE_VARIABLE, varName)
+			return nil
+		}
+
 		if identifierNode, ok := n[0].(parser.Identifier); ok {
 			switch identifierNode.Value {
-			case "let":
-				//fmt.Println("Handling 'def' statement")
-				if len(n) != 3 {
-					return fmt.Errorf("let expects two arguments")
-				}
-				varName, ok := n[1].(parser.Identifier)
-				if !ok {
-					return fmt.Errorf("expected a variable name as the second argument to let")
-				}
-				//fmt.Printf("Variable name for 'def': %s\n", varName.Value)
-
-				err := c.compileNode(n[2])
-				if err != nil {
-					return err
-				}
-				//fmt.Printf("Emitting DEFINE_VARIABLE for %s\n", varName.Value)
-				c.emit(DEFINE_VARIABLE, varName.Value)
-				return nil
 			case "def":
 				// (def funFunction (param) ;do fun func stuff (ret optionalReturnValue))
 				if len(n) < 3 {
@@ -309,7 +335,9 @@ func (c *Compiler) compileNode(node interface{}) error {
 					if err := c.compileNode(arg); err != nil {
 						return err
 					}
+					fmt.Printf("===compiled arg: %v\n", arg)
 				}
+				fmt.Printf("=======compiling func call: %v\n", symbol)
 				c.emit(CALL_FUNCTION, funcNameNode.Value)
 				return nil
 			}
@@ -334,9 +362,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 		symbol, found := c.symbolTable.Resolve(n.Value)
 		if found {
 			if symbol.Type == FunctionSymbol {
-				if c.isInsideFunction() {
-					c.emit(PUSH_VARIABLE, n.Value)
-				}
+				c.emit(CALL_FUNCTION, n.Value)
 			} else if symbol.Type == VariableSymbol {
 				if c.isInsideFunction() && c.symbolTable.IsFunctionParameter(c.currentFunction, n.Value) {
 					c.emit(PUSH_VARIABLE, n.Value)
@@ -471,6 +497,7 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 	fmt.Println("Function compiled:", fnDef.Name)
 	return nil
 }
+
 func (c *Compiler) enterScope() {
 	c.symbolTable = NewSymbolTable(c.symbolTable)
 }

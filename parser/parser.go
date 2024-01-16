@@ -82,6 +82,11 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			result, err = p.parseIfStatement()
 		} else if p.currentToken.Literal == "ret" {
 			result, err = p.parseReturnStatement()
+		} else if p.currentToken.Literal == "let" {
+			p.nextToken()
+			return p.parseVariableDefinition()
+		} else if p.peekTokenIs(lexer.LPAREN) {
+			return p.parseFunctionCall()
 		} else {
 			result = Identifier{Value: p.currentToken.Literal}
 		}
@@ -107,23 +112,25 @@ func (p *Parser) parseExpression() (interface{}, error) {
 		operator := Operator{Value: p.currentToken.Literal}
 		p.nextToken()
 
-		var operands []interface{}
+		//var operands []interface{}
 		firstOperand, err := p.parseOperand()
 		if err != nil {
 			return nil, err
 		}
-		operands = append(operands, firstOperand)
+		//operands = append(operands, firstOperand)
 
+		var secondOperand []interface{}
 		if !p.peekTokenIs(lexer.RPAREN) && p.peekToken.Type != lexer.EOF {
 			p.nextToken()
-			secondOperand, err := p.parseOperand()
+			operand, err := p.parseOperand()
 			if err != nil {
 				return nil, err
 			}
-			operands = append(operands, secondOperand)
+			//operands = append(operands, secondOperand)
+			secondOperand = append(secondOperand, operand)
 		}
 
-		result = append([]interface{}{operator}, operands...)
+		result = append([]interface{}{operator}, []interface{}{firstOperand}, []interface{}{secondOperand})
 	case lexer.LPAREN:
 		p.nextToken()
 		return p.parseParenExpression()
@@ -289,6 +296,34 @@ func (p *Parser) parseFunctionDefinition() (interface{}, error) {
 	}, nil
 }
 
+func (p *Parser) parseVariableDefinition() (TypeAnnotation, error) {
+	// Ensure the current token is an identifier for the variable name
+	if p.currentToken.Type != lexer.IDENT {
+		return TypeAnnotation{}, fmt.Errorf("expected variable name, got %s", p.currentToken.Literal)
+	}
+
+	varName := p.currentToken.Literal
+
+	// Move to the next token, which should be a colon before the type
+	p.nextToken()
+	if p.currentToken.Type != lexer.COLON {
+		return TypeAnnotation{}, fmt.Errorf("expected ':' after variable name, got %s", p.currentToken.Literal)
+	}
+
+	// Move to the type identifier
+	p.nextToken()
+	if p.currentToken.Type != lexer.IDENT {
+		return TypeAnnotation{}, fmt.Errorf("expected variable type identifier after ':', got %s", p.currentToken.Literal)
+	}
+
+	varType := p.currentToken.Literal
+
+	return TypeAnnotation{
+		Variable: varName,
+		Type:     varType,
+	}, nil
+}
+
 func (p *Parser) parseFunctionParameters() ([]TypeAnnotation, error) {
 	var params []TypeAnnotation
 
@@ -376,6 +411,28 @@ func (p *Parser) parseReturnStatement() (ReturnStatement, error) {
 	}
 
 	return ReturnStatement{ReturnValue: ret}, nil
+}
+
+func (p *Parser) parseFunctionCall() (interface{}, error) {
+	funcName := p.currentToken.Literal
+	p.nextToken()
+
+	p.nextToken()
+	var args []interface{}
+	for !p.currentTokenIs(lexer.RPAREN) && !p.currentTokenIs(lexer.EOF) {
+		arg, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+		p.nextToken()
+	}
+
+	if !p.currentTokenIs(lexer.RPAREN) {
+		return nil, fmt.Errorf("expected ')' at the end of function arguments, got %s", p.currentToken.Literal)
+	}
+
+	return []interface{}{Identifier{Value: funcName}, args}, nil
 }
 
 func (p *Parser) Parse() (interface{}, error) {
