@@ -326,8 +326,8 @@ func (vm *VM) Run() error {
 			//fmt.Printf(value)
 			fmt.Println()
 			vmPrint(value)
+			fmt.Println()
 			vm.stack = vm.stack[:len(vm.stack)-1]
-
 		case compiler.DEFINE_VARIABLE:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("DEFINE_VARIABLE instruction requires a variable name as operand")
