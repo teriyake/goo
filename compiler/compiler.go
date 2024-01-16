@@ -18,20 +18,22 @@ type Opcode int
 const (
 	ADD Opcode = iota
 	SUB
+	MUL
+	DIV
 	GRT
 	LESS
 	EQ
 	NEQ
-	IF
-	ELSE
-	ENDIF
-	PRINT
 	PUSH_VARIABLE Opcode = iota + 20
 	PUSH_NUMBER
 	PUSH_BOOL
 	PUSH_STRING
-	DEFINE_VARIABLE Opcode = iota + 30
+	DEFINE_VARIABLE
 	DEFINE_FUNCTION
+	IF Opcode = iota + 30
+	ELSE
+	ENDIF
+	PRINT
 	RETURN
 	JUMP
 	CALL_FUNCTION
@@ -42,6 +44,31 @@ type BytecodeInstruction struct {
 	Operands []interface{}
 }
 
+type DataType int
+
+const (
+	IntType DataType = iota
+	FloatType
+	StringType
+	BoolType
+)
+
+func ParseDataType(pt string) DataType {
+	switch pt {
+	case "int":
+		return IntType
+	case "float":
+		return FloatType
+	case "string":
+		return StringType
+	case "bool":
+		return BoolType
+	// more cases later
+	default:
+		return IntType // default to IntType for unknown types??
+	}
+}
+
 type SymbolType int
 
 const (
@@ -50,9 +77,11 @@ const (
 )
 
 type Symbol struct {
-	Name       string
-	Type       SymbolType
-	ParamNames []string
+	Name         string
+	Type         SymbolType
+	DataType     DataType
+	ParamNames   []string
+	StartAddress int
 }
 
 type SymbolTable struct {
@@ -67,22 +96,36 @@ func NewSymbolTable(parent *SymbolTable) *SymbolTable {
 	}
 }
 
-func (st *SymbolTable) DefineSymbol(name string, symbolType SymbolType) {
-	st.Symbols[name] = Symbol{
-		Name: name,
-		Type: symbolType,
+func (st *SymbolTable) Print() {
+	fmt.Println("Symbol Table:")
+	for name, symbol := range st.Symbols {
+		fmt.Printf("Name: %s, Type: %s", name, symbol.Type)
+		if symbol.Type == FunctionSymbol {
+			fmt.Printf(", Param Names: %v", symbol.ParamNames)
+		}
+		fmt.Printf(", Start Address: %d\n", symbol.StartAddress)
 	}
 }
 
-func (st *SymbolTable) DefineVariable(name string) {
-	st.DefineSymbol(name, VariableSymbol)
+func (st *SymbolTable) DefineSymbol(name string, symbolType SymbolType, dataType DataType) {
+	st.Symbols[name] = Symbol{
+		Name:     name,
+		Type:     symbolType,
+		DataType: dataType,
+	}
 }
 
-func (st *SymbolTable) DefineFunction(name string, startAddress int, paramNames []string) {
+func (st *SymbolTable) DefineVariable(name string, dataType DataType) {
+	st.DefineSymbol(name, VariableSymbol, dataType)
+}
+
+func (st *SymbolTable) DefineFunction(name string, startAddress int, paramNames []string, returnType DataType) {
 	symbol := Symbol{
-		Name:       name,
-		Type:       FunctionSymbol,
-		ParamNames: paramNames,
+		Name:         name,
+		Type:         FunctionSymbol,
+		ParamNames:   paramNames,
+		StartAddress: startAddress,
+		DataType:     returnType,
 	}
 	st.Symbols[name] = symbol
 }
@@ -106,16 +149,55 @@ func (st *SymbolTable) ResolveLocal(funcName, name string) (Symbol, bool) {
 	return Symbol{}, false
 }
 
+func (st *SymbolTable) IsFunction(name string) bool {
+	symbol, ok := st.Resolve(name)
+	if !ok {
+		return false
+	}
+	return symbol.Type == FunctionSymbol
+}
+
+func (st *SymbolTable) IsFunctionParameter(funcName, name string) bool {
+	symbol, ok := st.ResolveLocal(funcName, name)
+	if !ok {
+		return false
+	}
+	return symbol.Type == VariableSymbol
+}
+
+func (st *SymbolTable) UpdateFunctionStartAddress(name string, address int) {
+	if symbol, ok := st.Symbols[name]; ok && symbol.Type == FunctionSymbol {
+		symbol.StartAddress = address
+		st.Symbols[name] = symbol
+	}
+}
+
 type Compiler struct {
-	bytecode    []byte
-	symbolTable *SymbolTable
+	bytecode        []byte
+	symbolTable     *SymbolTable
+	currentFunction string
+	insideFunction  bool
 }
 
 func NewCompiler() *Compiler {
 	return &Compiler{
-		bytecode:    []byte{},
-		symbolTable: NewSymbolTable(nil),
+		bytecode:        []byte{},
+		symbolTable:     NewSymbolTable(nil),
+		currentFunction: "",
+		insideFunction:  false,
 	}
+}
+
+func (c *Compiler) setCurrentFunction(functionName string) {
+	c.currentFunction = functionName
+}
+
+func (c *Compiler) getCurrentFunction() string {
+	return c.currentFunction
+}
+
+func (c *Compiler) isInsideFunction() bool {
+	return c.currentFunction != ""
 }
 
 func (c *Compiler) CompileASTByte(ast interface{}) ([]byte, error) {
@@ -248,9 +330,23 @@ func (c *Compiler) compileNode(node interface{}) error {
 				return err
 			}
 		}
-
 	case parser.Identifier:
-		c.emit(PUSH_VARIABLE, n.Value)
+		symbol, found := c.symbolTable.Resolve(n.Value)
+		if found {
+			if symbol.Type == FunctionSymbol {
+				if c.isInsideFunction() {
+					c.emit(PUSH_VARIABLE, n.Value)
+				}
+			} else if symbol.Type == VariableSymbol {
+				if c.isInsideFunction() && c.symbolTable.IsFunctionParameter(c.currentFunction, n.Value) {
+					c.emit(PUSH_VARIABLE, n.Value)
+				} else {
+					c.emit(PUSH_VARIABLE, n.Value)
+				}
+			}
+		} else {
+			return fmt.Errorf("undefined identifier: %s", n.Value)
+		}
 	case parser.Number:
 		c.emit(PUSH_NUMBER, n.Value)
 	case parser.Boolean:
@@ -265,6 +361,8 @@ func (c *Compiler) compileNode(node interface{}) error {
 			c.emit(ADD)
 		case "-":
 			c.emit(SUB)
+		case "*":
+			c.emit(MUL)
 		case ">":
 			c.emit(GRT)
 		case "<":
@@ -321,51 +419,58 @@ func (c *Compiler) compileNode(node interface{}) error {
 }
 
 func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) error {
+	fmt.Println("Compiling function definition:", fnDef.Name)
 	startAddress := len(c.bytecode)
 
-	//jumpIndex := len(fnDef.Body) + 2 // also has to jump over JUMP and RETURN
-	placeholderJumpIndex := len(c.bytecode)
-	c.emit(JUMP, 0) // Placeholder offset
-
-	c.enterScope()
 	var paramNames []string
 	for _, param := range fnDef.Params {
-		c.symbolTable.DefineVariable(param)
-		paramNames = append(paramNames, param)
+		paramNames = append(paramNames, param.Variable)
+		c.symbolTable.DefineVariable(param.Variable, ParseDataType(param.Type))
+		fmt.Printf("Defined variable: %s\n", param)
 	}
+	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames, ParseDataType(fnDef.ReturnType))
 
-	//instructionCountBeforeBody := len(c.bytecode)
+	fmt.Println("Symbol table after defining parameters:")
+	c.symbolTable.Print()
+
+	c.emit(JUMP, 0)
+
+	c.enterScope()
+	c.setCurrentFunction(fnDef.Name)
+
+	instructionCountBeforeBody := len(c.bytecode)
 	for _, expr := range fnDef.Body {
-		if err := c.compileNode(expr); err != nil {
-			return err
+		switch e := expr.(type) {
+		case parser.ReturnStatement:
+			if err := c.compileNode(e.ReturnValue); err != nil {
+				return err
+			}
+			c.emit(RETURN)
+		default:
+			if err := c.compileNode(expr); err != nil {
+				return err
+			}
 		}
 	}
-	//instructionCountAfterBody := len(c.bytecode)
-
 	if !c.endsInReturn(fnDef.Body) {
 		c.emit(RETURN)
 	}
-
-	jumpOffset := len(c.bytecode) - startAddress
-	updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
+	instructionCountAfterBody := len(c.bytecode)
+	jumpOffset := instructionCountAfterBody - instructionCountBeforeBody
+	correctOffset := calculateCorrectedOffset(c.bytecode, jumpOffset) - 1
+	updateJumpInstruction(c.bytecode, startAddress, correctOffset)
 	c.leaveScope()
 
-	//jumpOffset := instructionCountAfterBody - instructionCountBeforeBody
-	//updateJumpInstruction(c.bytecode, placeholderJumpIndex, jumpOffset)
+	fmt.Println("Symbol table after leaving scope:")
+	c.symbolTable.Print()
 
-	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames)
+	c.setCurrentFunction("")
+	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames, ParseDataType(fnDef.ReturnType))
 	paramCount := len(fnDef.Params)
 	c.emitDefineFunction(fnDef.Name, startAddress, paramCount, paramNames)
-
+	fmt.Println("Function compiled:", fnDef.Name)
 	return nil
 }
-
-func updateJumpInstruction(bytecode []byte, jumpIndex int, offset int) {
-	offsetBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(offsetBytes, uint32(offset))
-	copy(bytecode[jumpIndex+1:], offsetBytes) // +1 to skip the opcode byte
-}
-
 func (c *Compiler) enterScope() {
 	c.symbolTable = NewSymbolTable(c.symbolTable)
 }
@@ -441,30 +546,42 @@ func serializeOperands(operands []interface{}) []byte {
 	return result
 }
 
-func calculateCorrectedOffset(bytecode []byte, offset int) int {
-	count := 0
-	offset -= 5
-	for i := 0; i < offset && i < len(bytecode); {
+func calculateCorrectedOffset(bytecode []byte, targetOffset int) int {
+	instructionCount := 0
+	i := 0
+
+	for i < len(bytecode) && instructionCount < targetOffset {
 		opcode := Opcode(bytecode[i])
 		i++
 
 		switch opcode {
 		case PUSH_NUMBER:
 			i += 8
-		case PUSH_STRING, PUSH_BOOL, PUSH_VARIABLE, DEFINE_VARIABLE:
+		case PUSH_STRING, PUSH_VARIABLE, DEFINE_VARIABLE, CALL_FUNCTION:
 			if i+4 > len(bytecode) {
 				break
 			}
 			operandLength := int(binary.LittleEndian.Uint32(bytecode[i : i+4]))
 			i += 4 + operandLength
+		case PUSH_BOOL:
+			i++
 		case JUMP:
 			i += 4
-			// ... other cases ...
+
+		default:
+
 		}
 
-		count++
+		instructionCount++
 	}
-	return count
+
+	return instructionCount
+}
+
+func updateJumpInstruction(bytecode []byte, jumpIndex int, correctedOffset int) {
+	offsetBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(offsetBytes, uint32(correctedOffset))
+	copy(bytecode[jumpIndex+1:], offsetBytes)
 }
 
 func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
@@ -497,12 +614,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			strLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+			strLenBytes := rawBytecode[i : i+4]
 			i += 4
+			strLen := int(binary.LittleEndian.Uint32(strLenBytes))
 
 			if i+strLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
+			operands = append(operands, strLenBytes)
 			strBytes := rawBytecode[i : i+strLen]
 			operands = append(operands, strBytes)
 			i += strLen
@@ -510,12 +629,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			varNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+			varNameLenBytes := rawBytecode[i : i+4]
 			i += 4
+			varNameLen := int(binary.LittleEndian.Uint32(varNameLenBytes))
 
 			if i+varNameLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
+			operands = append(operands, varNameLenBytes)
 			varBytes := rawBytecode[i : i+varNameLen]
 			operands = append(operands, varBytes)
 			i += varNameLen
@@ -523,12 +644,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			varNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+			varNameLenBytes := rawBytecode[i : i+4]
 			i += 4
 
+			varNameLen := int(binary.LittleEndian.Uint32(varNameLenBytes))
 			if i+varNameLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
+			operands = append(operands, varNameLenBytes)
 			varBytes := rawBytecode[i : i+varNameLen]
 			operands = append(operands, varBytes)
 			i += varNameLen
@@ -597,12 +720,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			if i+4 > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
-			funcNameLen := int(binary.LittleEndian.Uint32(rawBytecode[i : i+4]))
+			funcNameLenBytes := rawBytecode[i : i+4]
 			i += 4
+			funcNameLen := int(binary.LittleEndian.Uint32(funcNameLenBytes))
 
 			if i+funcNameLen > len(rawBytecode) {
 				return nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}
+			operands = append(operands, funcNameLenBytes)
 			funcNameBytes := rawBytecode[i : i+funcNameLen]
 			operands = append(operands, funcNameBytes)
 			i += funcNameLen
@@ -612,11 +737,7 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			}
 			jumpOffsetBytes := rawBytecode[i : i+4]
 			i += 4
-			jumpOffset := int(binary.LittleEndian.Uint32(jumpOffsetBytes))
-			correctedOffset := calculateCorrectedOffset(rawBytecode[i:], jumpOffset)
-			offsetBytes := make([]byte, 4)
-			binary.LittleEndian.PutUint32(offsetBytes, uint32(correctedOffset))
-			operands = append(operands, offsetBytes)
+			operands = append(operands, jumpOffsetBytes)
 
 		default:
 			// Opcodes without operands

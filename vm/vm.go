@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 	"teriyake/goo/compiler"
 )
 
@@ -16,6 +17,23 @@ func NewRuntimeSymbolTable(parent *RuntimeSymbolTable) *RuntimeSymbolTable {
 	return &RuntimeSymbolTable{
 		symbols: make(map[string]interface{}),
 		parent:  parent,
+	}
+}
+
+func (rst *RuntimeSymbolTable) Print(indent string) {
+	if rst == nil {
+		fmt.Println(indent + "Symbol Table: nil")
+		return
+	}
+
+	fmt.Println(indent + "Symbol Table:")
+	for name, value := range rst.symbols {
+		fmt.Printf("%s  %s: %v\n", indent, name, value)
+	}
+
+	if rst.parent != nil {
+		fmt.Println(indent + "Parent:")
+		rst.parent.Print(indent + "  ")
 	}
 }
 
@@ -37,9 +55,19 @@ type FunctionMetadata struct {
 	ParamNames   []string
 }
 
+func (fm FunctionMetadata) Print() {
+	fmt.Printf("FunctionMetadata - Start Address: %d, Param Count: %d, Param Names: %v\n", fm.StartAddress, fm.ParamCount, fm.ParamNames)
+}
+
 type CallStackEntry struct {
 	returnAddress int
 	symbolTable   *RuntimeSymbolTable
+}
+
+func (cse CallStackEntry) Print() {
+	fmt.Printf("CallStackEntry - Return Address: %d\n", cse.returnAddress)
+	fmt.Println("Symbol Table at this level:")
+	cse.symbolTable.Print("  ")
 }
 
 type VM struct {
@@ -61,6 +89,32 @@ func NewVM(code []compiler.BytecodeInstruction) *VM {
 		symbolTableStack: []*RuntimeSymbolTable{globalSymbolTable},
 		functions:        make(map[string]FunctionMetadata),
 		callStack:        make([]CallStackEntry, 0),
+	}
+}
+
+func (vm *VM) Print() {
+	fmt.Println("VM State:")
+	fmt.Printf("  Program Counter: %d\n", vm.pc)
+	fmt.Printf("  Stack: %v\n", vm.stack)
+
+	fmt.Println("  Symbol Table Stack:")
+	for _, st := range vm.symbolTableStack {
+		st.Print("    ")
+	}
+
+	fmt.Println("  Function Metadata:")
+	for name, fm := range vm.functions {
+		fmt.Printf("    %s: ", name)
+		fm.Print()
+	}
+
+	fmt.Println("  Call Stack:")
+	if len(vm.callStack) == 0 {
+		fmt.Println("    EMPTY")
+	} else {
+		for _, cse := range vm.callStack {
+			cse.Print()
+		}
 	}
 }
 
@@ -98,6 +152,7 @@ func (vm *VM) Run() error {
 	for vm.pc < len(vm.code) {
 		instruction := vm.code[vm.pc]
 		fmt.Printf("Executing Instruction at PC %v: Opcode %d, Operands %v\n", vm.pc, instruction.Opcode, instruction.Operands)
+		vm.Print()
 		vm.pc++
 
 		switch instruction.Opcode {
@@ -124,17 +179,19 @@ func (vm *VM) Run() error {
 			boolValue := operandByte != 0
 			vm.stack = append(vm.stack, boolValue)
 			fmt.Printf("Stack after PUSH_BOOL: %v\n", vm.stack)
-
 		case compiler.PUSH_STRING:
-			if len(instruction.Operands) < 1 {
-				return fmt.Errorf("PUSH_STRING instruction requires an operand")
+			strLenBytes, ok := instruction.Operands[0].([]byte)
+			if !ok || len(strLenBytes) != 4 {
+				return fmt.Errorf("Invalid or missing length for string in PUSH_STRING instruction")
 			}
-			operandBytes, ok := instruction.Operands[0].([]byte)
-			if !ok {
-				return fmt.Errorf("Invalid operand type for PUSH_STRING instruction")
+			strLen := int(binary.LittleEndian.Uint32(strLenBytes))
+
+			strBytes, ok := instruction.Operands[1].([]byte)
+			if !ok || len(strBytes) != strLen {
+				return fmt.Errorf("Invalid or missing string in PUSH_STRING instruction")
 			}
-			stringValue := string(operandBytes)
-			vm.stack = append(vm.stack, stringValue)
+			strVal := string(strBytes)
+			vm.stack = append(vm.stack, strVal)
 			fmt.Printf("Stack after PUSH_STRING: %v\n", vm.stack)
 		case compiler.ADD:
 			if len(vm.stack) < 2 {
@@ -162,6 +219,19 @@ func (vm *VM) Run() error {
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
 			fmt.Printf("Stack after SUB: %v\n", vm.stack)
+		case compiler.MUL:
+			if len(vm.stack) < 2 {
+				return fmt.Errorf("MUL instruction requires at least 2 values on the stack")
+			}
+			operand2, ok1 := vm.stack[len(vm.stack)-1].(float64)
+			operand1, ok2 := vm.stack[len(vm.stack)-2].(float64)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("MUL instruction requires float operands")
+			}
+			result := operand1 * operand2
+			vm.stack = vm.stack[:len(vm.stack)-2]
+			vm.stack = append(vm.stack, result)
+			fmt.Printf("Stack after MUL: %v\n", vm.stack)
 		case compiler.GRT:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("GRT instruction requires at least 2 values on the stack")
@@ -253,7 +323,9 @@ func (vm *VM) Run() error {
 				return fmt.Errorf("PRINT instruction requires a value on the stack")
 			}
 			value := vm.stack[len(vm.stack)-1]
-			fmt.Println(value)
+			//fmt.Printf(value)
+			fmt.Println()
+			vmPrint(value)
 			vm.stack = vm.stack[:len(vm.stack)-1]
 
 		case compiler.DEFINE_VARIABLE:
@@ -261,7 +333,7 @@ func (vm *VM) Run() error {
 				return fmt.Errorf("DEFINE_VARIABLE instruction requires a variable name as operand")
 			}
 
-			varBytes, ok := instruction.Operands[0].([]byte)
+			varBytes, ok := instruction.Operands[1].([]byte)
 			if !ok {
 				return fmt.Errorf("Invalid operand type for DEFINE_VARIABLE instruction")
 			}
@@ -281,19 +353,32 @@ func (vm *VM) Run() error {
 			currentSymbolTable.Set(varName, value)
 
 			fmt.Printf("Variable %s defined with value: %v\n", varName, value)
-
 		case compiler.PUSH_VARIABLE:
-			varNameBytes, ok := instruction.Operands[0].([]byte)
-			if !ok {
-				return fmt.Errorf("Invalid operand for PUSH_VARIABLE instruction")
+			varNameLenBytes, ok := instruction.Operands[0].([]byte)
+			if !ok || len(varNameLenBytes) != 4 {
+				return fmt.Errorf("Invalid or missing length for variable name in PUSH_VARIABLE instruction")
+			}
+			varNameLen := int(binary.LittleEndian.Uint32(varNameLenBytes))
+
+			varNameBytes, ok := instruction.Operands[1].([]byte)
+			if !ok || len(varNameBytes) != varNameLen {
+				return fmt.Errorf("Invalid or missing variable name in PUSH_VARIABLE instruction")
 			}
 			varName := string(varNameBytes)
 
-			currentSymbolTable := vm.symbolTableStack[len(vm.symbolTableStack)-1]
+			var value interface{}
+			found := false
+			for i := len(vm.symbolTableStack) - 1; i >= 0; i-- {
+				symbolTable := vm.symbolTableStack[i]
+				if val, exists := symbolTable.symbols[varName]; exists {
+					value = val
+					found = true
+					break
+				}
+			}
 
-			value, ok := currentSymbolTable.Get(varName)
-			if !ok {
-				return fmt.Errorf("Variable %s not defined", varName)
+			if !found {
+				return fmt.Errorf("Variable not found: %s", varName)
 			}
 
 			vm.stack = append(vm.stack, value)
@@ -351,37 +436,49 @@ func (vm *VM) Run() error {
 			fmt.Printf("Current PC: %v\n", vm.pc)
 
 		case compiler.CALL_FUNCTION:
-			funcNameBytes, ok := instruction.Operands[0].([]byte)
-			if !ok {
-				return fmt.Errorf("Invalid operand for CALL_FUNCTION instruction")
+			funcNameLenBytes, ok := instruction.Operands[0].([]byte)
+			if !ok || len(funcNameLenBytes) != 4 {
+				return fmt.Errorf("Invalid length for function name length in CALL_FUNCTION instruction")
 			}
+
+			funcNameLen := int(binary.LittleEndian.Uint32(funcNameLenBytes))
+
+			funcNameBytes, ok := instruction.Operands[1].([]byte)
+			if !ok || len(funcNameBytes) != funcNameLen {
+				return fmt.Errorf("Invalid or missing function name in CALL_FUNCTION instruction")
+			}
+
 			funcName := string(funcNameBytes)
+			fmt.Printf("CALL_FUNCTION for %s\n", funcName)
 
 			functionMetadata, ok := vm.functions[funcName]
 			if !ok {
 				return fmt.Errorf("Function %s not defined", funcName)
 			}
 
-			vm.callStack = append(vm.callStack, CallStackEntry{
-				returnAddress: vm.pc,
-				symbolTable:   vm.symbolTableStack[len(vm.symbolTableStack)-1],
-			})
-
-			vm.pc = functionMetadata.StartAddress
-
-			newSymbolTable := NewRuntimeSymbolTable(vm.symbolTableStack[len(vm.symbolTableStack)-1])
-			vm.symbolTableStack = append(vm.symbolTableStack, newSymbolTable)
-
-			for i, paramName := range functionMetadata.ParamNames {
-				if len(vm.stack) < len(functionMetadata.ParamNames)-i {
-					return fmt.Errorf("Not enough arguments for function %s", funcName)
-				}
-				paramValue := vm.stack[len(vm.stack)-len(functionMetadata.ParamNames)+i]
-				newSymbolTable.Set(paramName, paramValue)
+			argCount := functionMetadata.ParamCount
+			if len(vm.stack) < argCount {
+				return fmt.Errorf("Not enough arguments on stack for function %s", funcName)
 			}
 
-			vm.stack = vm.stack[:len(vm.stack)-len(functionMetadata.ParamNames)]
+			args := make([]interface{}, argCount)
+			for i := argCount - 1; i >= 0; i-- {
+				arg, err := vm.pop()
+				if err != nil {
+					return err
+				}
+				args[i] = arg
+			}
 
+			newSymbolTable := NewRuntimeSymbolTable(vm.symbolTableStack[len(vm.symbolTableStack)-1])
+			for i, paramName := range functionMetadata.ParamNames {
+				newSymbolTable.Set(paramName, args[i])
+			}
+			vm.callStack = append(vm.callStack, CallStackEntry{returnAddress: vm.pc, symbolTable: vm.symbolTableStack[len(vm.symbolTableStack)-1]})
+			vm.symbolTableStack = append(vm.symbolTableStack, newSymbolTable)
+			vm.pc = functionMetadata.StartAddress
+
+			fmt.Println("Jumping to function start address:", vm.pc)
 			continue
 		case compiler.RETURN:
 			if len(vm.callStack) == 0 {
@@ -398,10 +495,10 @@ func (vm *VM) Run() error {
 
 			vm.pc = callStackEntry.returnAddress
 			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
-			vm.symbolTableStack = append(vm.symbolTableStack, callStackEntry.symbolTable)
 
 			vm.push(returnValue)
 
+			fmt.Printf("Returning to address %d with value %v\n", vm.pc, returnValue)
 			continue
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
@@ -442,6 +539,10 @@ func (vm *VM) Run() error {
 		}
 	}
 
+	fmt.Println()
+	fmt.Printf("All instructions executed. Last executed instruction PC: %v\n", vm.pc)
+	fmt.Printf("Exiting VM...\n")
+	fmt.Println()
 	return nil
 }
 
@@ -453,4 +554,14 @@ func (vm *VM) jumpToOpcode(opcode compiler.Opcode) {
 		}
 		vm.pc++
 	}
+}
+
+func vmPrint(v interface{}) {
+	vStr := fmt.Sprintf("%v", v)
+	boxWidth := len(vStr) + 4
+	topBorder := strings.Repeat("-", boxWidth)
+	middle := fmt.Sprintf("| %s |", vStr)
+	fmt.Println(topBorder)
+	fmt.Println(middle)
+	fmt.Println(topBorder)
 }

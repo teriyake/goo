@@ -1,0 +1,179 @@
+Input: (def double (x: int) (ret (* x 2))) (print (double(97)))
+
+AST: []interface {}{parser.FunctionDefinition{Name:"double", Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}}, ReturnType:"", Body:[]interface {}{parser.ReturnStatement{ReturnValue:[]interface {}{[]interface {}{parser.Operator{Value:"*"}, parser.Identifier{Value:"x"}, parser.Number{Value:2}}}}}}, []interface {}{parser.Identifier{Value:"print"}, []interface {}{parser.Identifier{Value:"double"}, parser.Number{Value:97}}}}
+
+Compiling function definition: double
+Defined variable: {x int}
+Symbol table after defining parameters:
+Symbol Table:
+Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Name: double, Type: %!s(compiler.SymbolType=1), Param Names: [x], Start Address: 0
+Symbol table after leaving scope:
+Symbol Table:
+Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Name: double, Type: %!s(compiler.SymbolType=1), Param Names: [x], Start Address: 0
+Function compiled: double
+Raw Bytecode: [49 4 0 0 0 28 1 0 0 0 120 29 0 0 0 0 0 0 0 64 2 48 33 6 0 0 0 100 111 117 98 108 101 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 120 29 0 0 0 0 0 64 88 64 50 6 0 0 0 100 111 117 98 108 101 47]
+Pos: 0	Bytecode Instruction: {49 [[4 0 0 0]]}
+Pos: 1	Bytecode Instruction: {28 [[1 0 0 0] [120]]}
+Pos: 2	Bytecode Instruction: {29 [[0 0 0 0 0 0 0 64]]}
+Pos: 3	Bytecode Instruction: {2 []}
+Pos: 4	Bytecode Instruction: {48 []}
+Pos: 5	Bytecode Instruction: {33 [[100 111 117 98 108 101] [0 0 0 0] [1 0 0 0] [1 0 0 0] [1 0 0 0] [120]]}
+Pos: 6	Bytecode Instruction: {29 [[0 0 0 0 0 64 88 64]]}
+Pos: 7	Bytecode Instruction: {50 [[6 0 0 0] [100 111 117 98 108 101]]}
+Pos: 8	Bytecode Instruction: {47 []}
+
+Initial VM State: 
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
+Executing Instruction at PC 0: Opcode 49, Operands [[4 0 0 0]]
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Current PC: 1	Jump offset: 4
+Updated PC: 5
+Executing Instruction at PC 5: Opcode 33, Operands [[100 111 117 98 108 101] [0 0 0 0] [1 0 0 0] [1 0 0 0] [1 0 0 0] [120]]
+VM State:
+  Program Counter: 5
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Function double defined with param count: 1 and params: [x]
+Function double starts at: 1
+Current PC: 6
+Executing Instruction at PC 6: Opcode 29, Operands [[0 0 0 0 0 64 88 64]]
+VM State:
+  Program Counter: 6
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [97]
+Executing Instruction at PC 7: Opcode 50, Operands [[6 0 0 0] [100 111 117 98 108 101]]
+VM State:
+  Program Counter: 7
+  Stack: [97]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+    EMPTY
+CALL_FUNCTION for double
+Jumping to function start address: 1
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 97
+    Parent:
+      Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+CallStackEntry - Return Address: 8
+Symbol Table at this level:
+  Symbol Table:
+Stack after PUSH_VARIABLE (x): [97]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [97]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 97
+    Parent:
+      Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+CallStackEntry - Return Address: 8
+Symbol Table at this level:
+  Symbol Table:
+Stack after PUSH_NUMBER: [97 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [97 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 97
+    Parent:
+      Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+CallStackEntry - Return Address: 8
+Symbol Table at this level:
+  Symbol Table:
+Stack after MUL: [194]
+Executing Instruction at PC 4: Opcode 48, Operands []
+VM State:
+  Program Counter: 4
+  Stack: [194]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 97
+    Parent:
+      Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+CallStackEntry - Return Address: 8
+Symbol Table at this level:
+  Symbol Table:
+Returning to address 8 with value 194
+Executing Instruction at PC 8: Opcode 47, Operands []
+VM State:
+  Program Counter: 8
+  Stack: [194]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+    EMPTY
+
+-------
+| 194 |
+-------
+
+All instructions executed. Last executed instruction PC: 9
+Exiting VM...
+
+Final VM State: 
+VM State:
+  Program Counter: 9
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+    double: FunctionMetadata - Start Address: 1, Param Count: 1, Param Names: [x]
+  Call Stack:
+    EMPTY
+

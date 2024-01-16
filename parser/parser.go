@@ -32,10 +32,16 @@ type IfStatement struct {
 	ElseBlock interface{}
 }
 
+type TypeAnnotation struct {
+	Variable string
+	Type     string
+}
+
 type FunctionDefinition struct {
-	Name   string
-	Params []string
-	Body   []interface{}
+	Name       string
+	Params     []TypeAnnotation
+	ReturnType string
+	Body       []interface{}
 }
 
 type ReturnStatement struct {
@@ -268,15 +274,23 @@ func (p *Parser) parseFunctionDefinition() (interface{}, error) {
 		return FunctionDefinition{}, err
 	}
 
+	var returnType string
+	if returnType == "" && len(body) > 0 {
+		if lastExpr, ok := body[len(body)-1].(Identifier); ok {
+			returnType = lastExpr.Value
+		}
+	}
+
 	return FunctionDefinition{
-		Name:   functionName,
-		Params: params,
-		Body:   body,
+		Name:       functionName,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
 	}, nil
 }
 
-func (p *Parser) parseFunctionParameters() ([]string, error) {
-	var params []string
+func (p *Parser) parseFunctionParameters() ([]TypeAnnotation, error) {
+	var params []TypeAnnotation
 
 	p.nextToken()
 
@@ -289,9 +303,23 @@ func (p *Parser) parseFunctionParameters() ([]string, error) {
 			return nil, fmt.Errorf("expected parameter name, got %s", p.currentToken.Literal)
 		}
 
-		params = append(params, p.currentToken.Literal)
+		paramName := p.currentToken.Literal
 
-		p.nextToken()
+		var paramType string
+		if p.peekTokenIs(lexer.COLON) {
+			p.nextToken()
+			p.nextToken()
+			if p.currentToken.Type != lexer.IDENT {
+				return nil, fmt.Errorf("expected parameter type identifier after ':', got %s", p.currentToken.Literal)
+			}
+			paramType = p.currentToken.Literal
+			p.nextToken()
+		}
+
+		params = append(params, TypeAnnotation{
+			Variable: paramName,
+			Type:     paramType,
+		})
 
 		if p.currentToken.Type == lexer.COMMA {
 			p.nextToken()

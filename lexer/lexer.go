@@ -14,6 +14,7 @@ type Token struct {
 const (
 	LPAREN     = "LPAREN"
 	RPAREN     = "RPAREN"
+	COLON = "COLON"
 	IDENT      = "IDENT"
 	NUMBER     = "NUMBER"
 	BOOL       = "BOOL"
@@ -33,12 +34,13 @@ var tokenTypes = []struct {
 }{
 	{LPAREN, `^\(`},
 	{RPAREN, `^\)`},
+	{COLON, `^:`},
 	{BOOL, `^true|^false`},
 	{COMMA, `^,`},
+	{OPERATOR, `^[-><=+?*]+`},
 	{IDENT, `^[a-zA-Z_][a-zA-Z0-9_]*`},
 	{NUMBER, `^-?\d+(\.\d+)?`},
 	{STRING, `^'[^']*'`},
-	{OPERATOR, `^[-><=+?]+`},
 	{SPACE, `^\s`},
 	{WHITESPACE, `^\s+`},
 	{COMMENT, `^;[^\n]*`},
