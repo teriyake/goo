@@ -10,8 +10,10 @@ import (
 )
 
 func main() {
+	gooCode := "(print (filter ((x:int) -> (> x 0)) (-1 2 0)))"
+	//gooCode := "(filter ((x:int) -> (> x 0)) (-1 2 0))"
 	//gooCode := "(print(map ((x:int) -> (* x 2)) (1 2 3 4 5)))"
-	gooCode := "(print(map ((x:int) -> (if (> x 0) ('pos') else ('neg'))) (-1 2 -3)))"
+	//gooCode := "(print(map ((x:int) -> (if (> x 0) ('pos') else ('neg'))) (-1 2 -3)))"
 	//gooCode := "print(((x:int) -> (if (> x 0) 'positive' else ('negative')))(-2))"
 	//gooCode := "print(((a:int b:int c:int) -> (+ (* a b) (* a c)))(2 3 4))"
 	//gooCode := "((x:int y:int) -> (* (+ y x) x))(3 5)"

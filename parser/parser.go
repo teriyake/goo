@@ -63,6 +63,11 @@ type MapExpression struct {
 	Arguments []interface{}
 }
 
+type FilterExpression struct {
+	Lambda    interface{}
+	Arguments []interface{}
+}
+
 type Parser struct {
 	lexer        *lexer.Lexer
 	currentToken lexer.Token
@@ -102,6 +107,8 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			return p.parseVariableDefinition()
 		} else if p.currentToken.Literal == "map" {
 			return p.parseMapExpression()
+		} else if p.currentToken.Literal == "filter"{
+			return p.parseFilterExpression()
 		} else if p.peekTokenIs(lexer.LPAREN) {
 			return p.parseFunctionCall()
 		} else {
@@ -154,6 +161,9 @@ func (p *Parser) parseExpression() (interface{}, error) {
 		p.nextToken()
 		if p.currentToken.Literal == "map" {
 			return p.parseMapExpression()
+		} 
+		if p.currentToken.Literal == "filter" {
+			return p.parseFilterExpression()
 		}
 		if p.isLambdaExpression() {
 			lambdaExpr, err := p.parseLambdaExpression()
@@ -275,6 +285,26 @@ func (p *Parser) parseMapExpression() (interface{}, error) {
 	}
 
 	return MapExpression{
+		Lambda:    lambdaExpr,
+		Arguments: args,
+	}, nil
+}
+
+func (p *Parser) parseFilterExpression() (interface{}, error) {
+	p.nextToken()
+	p.nextToken()
+
+	lambdaExpr, err := p.parseLambdaExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := p.parseExpressionList()
+	if err != nil {
+		return nil, err
+	}
+
+	return FilterExpression{
 		Lambda:    lambdaExpr,
 		Arguments: args,
 	}, nil

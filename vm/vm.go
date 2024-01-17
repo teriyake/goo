@@ -729,9 +729,7 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			fmt.Printf("Returning to address %d with value %v\n", vm.pc, returnValue)
 			continue
-
 		case compiler.MAP:
-
 			numArgs := int(binary.LittleEndian.Uint32(instruction.Operands[0].([]byte)))
 
 			args := make([]interface{}, numArgs)
@@ -743,11 +741,11 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 				args[i] = arg
 			}
 
-			lambdaFuncInterface, err := vm.pop()
+			poppedLambda, err := vm.pop()
 			if err != nil {
 				return fmt.Errorf("error executing MAP: %v", err)
 			}
-			lambdaFunc, ok := lambdaFuncInterface.(*LambdaFunction)
+			lambdaFunc, ok := poppedLambda.(*LambdaFunction)
 			if !ok {
 				return fmt.Errorf("error executing MAP: expected a lambda function")
 			}
@@ -763,6 +761,45 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			vm.push(results)
 
+			//return nil
+		case compiler.FILTER:
+			numArgsBytes, ok := instruction.Operands[0].([]byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand for FILTER instruction")
+			}
+			numArgs := int(binary.LittleEndian.Uint32(numArgsBytes))
+
+			var args []interface{}
+			for i := 0; i < numArgs; i++ {
+				arg, err := vm.pop()
+				if err != nil {
+					return err
+				}
+				args = append(args, arg)
+			}
+
+			poppedLambda, err := vm.pop()
+			if err != nil {
+				return fmt.Errorf("error executing FILTER: %v", err)
+			}
+			lambdaFunc, ok := poppedLambda.(*LambdaFunction)
+			if !ok {
+				return fmt.Errorf("error executing FILTER: expected a lambda function")
+			}
+
+			var filteredResults []interface{}
+			for i := len(args) - 1; i >= 0; i-- {
+				result, err := vm.executeLambda(lambdaFunc, []interface{}{args[i]})
+				if err != nil {
+					return err
+				}
+
+				if resultBool, ok := result.(bool); ok && resultBool {
+					filteredResults = append(filteredResults, args[i])
+				}
+			}
+
+			vm.push(filteredResults)
 			//return nil
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
