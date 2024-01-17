@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"teriyake/goo/lexer"
 	"teriyake/goo/parser"
 	"teriyake/goo/compiler"
@@ -9,8 +10,8 @@ import (
 )
 
 func main() {
-	//gooCode := "(lambda (x:int) (* x x))"
-	gooCode := "((x:int y:int z:int) -> (* y x))"
+	//gooCode := "((x:int y:int) -> (* (+ y x) x))(3 5)"
+	gooCode := "((x:int) -> (* x x))(7)"
 	//gooCode := "(let x:int 3) (print (- x 1))"
 	//gooCode := "(def factorial (x:int) (if (= x 0) (ret 1) else (ret (* x factorial(- x 1))))) (print (factorial(5)))"
 	//gooCode := "(def double (x: int) (ret (* x 2))) (print (double(7)))"
@@ -20,6 +21,9 @@ func main() {
 	//gooCode := "(def add_num (a b) (ret (+ a b))) (add_num 3 5)"
 	//gooCode := "(let x 1) (print x)"
 	//gooCode := "(let x 10) (let x 11)"
+	if len(os.Args) > 1{
+		gooCode = os.Args[1]
+	}
 	fmt.Printf("Input: %v\n", gooCode)
 	fmt.Println()
 	lexer := lexer.NewLexer(gooCode)
@@ -33,7 +37,7 @@ func main() {
 	}
 
 	comp := compiler.NewCompiler()
-	bytecodeInstructions, err := comp.CompileAST(ast)
+	bytecodeInstructions, offsetMap, err := comp.CompileAST(ast)
 	if err != nil {
 		fmt.Printf("Error compiling AST: %s\n", err)
 		return
@@ -45,7 +49,7 @@ func main() {
 	}
 	fmt.Println()
 
-	virtualMachine := vm.NewVM(bytecodeInstructions)
+	virtualMachine := vm.NewVM(bytecodeInstructions, offsetMap)
 	fmt.Printf("Initial VM State: \n")
 	virtualMachine.Print()
 	fmt.Println()

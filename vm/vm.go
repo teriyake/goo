@@ -60,56 +60,65 @@ func (fm FunctionMetadata) Print() {
 }
 
 type LambdaFunction struct {
-    StartAddress   int                    
-    EndAddress     int                 
-    ParamCount     int               
-    CapturedVars   []string        
-    SymbolTable    *RuntimeSymbolTable
+	StartAddress int
+	EndAddress   int
+	ParamCount   int
+	ParamNames   []string
+	CapturedVars []string
+	SymbolTable  *RuntimeSymbolTable
 }
 
-func NewLambdaFunction(startAddress, endAddress, paramCount int, capturedVars []string, symbolTable *RuntimeSymbolTable) *LambdaFunction {
-    return &LambdaFunction{
-        StartAddress: startAddress,
-        EndAddress:   endAddress,
-        ParamCount:   paramCount,
-        CapturedVars: capturedVars,
-        SymbolTable:  symbolTable,
-    }
+func NewLambdaFunction(startAddress, endAddress, paramCount int, paramNames []string, capturedVars []string, symbolTable *RuntimeSymbolTable) *LambdaFunction {
+	return &LambdaFunction{
+		StartAddress: startAddress,
+		EndAddress:   endAddress,
+		ParamCount:   paramCount,
+		ParamNames:   paramNames,
+		CapturedVars: capturedVars,
+		SymbolTable:  symbolTable,
+	}
 }
 
-func (lf LambdaFunction) Print() {
-	fmt.Printf("LambdaFunction - Start Address: %d, End Address: %d, Param Count: %d, Captured Vars: %v, Symbol Table: %v\n", lf.StartAddress, lf.EndAddress, lf.ParamCount, lf.CapturedVars, lf.SymbolTable)
+func (lf *LambdaFunction) Print(indent string) {
+	fmt.Printf("%sLambdaFunction:\n", indent)
+	fmt.Printf("%s  Start Address: %d\n", indent, lf.StartAddress)
+	fmt.Printf("%s  End Address: %d\n", indent, lf.EndAddress)
+	fmt.Printf("%s  Param Count: %d\n", indent, lf.ParamCount)
+	fmt.Printf("%s  Param Names: %d\n", indent, lf.ParamNames)
+	fmt.Printf("%s  Captured Vars: %v\n", indent, lf.CapturedVars)
+	fmt.Printf("%s  SymbolTable:\n", indent)
+	lf.SymbolTable.Print(indent + "    ")
 }
 
 func (lf *LambdaFunction) Call(vm *VM, args []interface{}) (interface{}, error) {
-    if len(args) != lf.ParamCount {
-        return nil, fmt.Errorf("lambda function expects %d arguments, got %d", lf.ParamCount, len(args))
-    }
+	if len(args) != lf.ParamCount {
+		return nil, fmt.Errorf("lambda function expects %d arguments, got %d", lf.ParamCount, len(args))
+	}
 
-    lambdaSymbolTable := NewRuntimeSymbolTable(lf.SymbolTable)
-    for i, paramName := range lf.CapturedVars {
-        lambdaSymbolTable.Set(paramName, args[i])
-    }
+	lambdaSymbolTable := NewRuntimeSymbolTable(lf.SymbolTable)
+	for i, paramName := range lf.CapturedVars {
+		lambdaSymbolTable.Set(paramName, args[i])
+	}
 
-    savedPC := vm.pc
-    //savedSymbolTable := vm.symbolTableStack[len(vm.symbolTableStack)-1]
+	savedPC := vm.pc
+	//savedSymbolTable := vm.symbolTableStack[len(vm.symbolTableStack)-1]
 
-    vm.symbolTableStack = append(vm.symbolTableStack, lambdaSymbolTable)
-    err := vm.Run(lf.StartAddress)
-    if err != nil {
-        return nil, err
-    }
+	vm.symbolTableStack = append(vm.symbolTableStack, lambdaSymbolTable)
+	err := vm.Run(lf.StartAddress)
+	if err != nil {
+		return nil, err
+	}
 
-    vm.pc = savedPC
-    vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
+	vm.pc = savedPC
+	vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
 
-    if len(vm.stack) == 0 {
-        return nil, fmt.Errorf("lambda function did not return a value")
-    }
-    result := vm.stack[len(vm.stack)-1]
-    vm.stack = vm.stack[:len(vm.stack)-1]
+	if len(vm.stack) == 0 {
+		return nil, fmt.Errorf("lambda function did not return a value")
+	}
+	result := vm.stack[len(vm.stack)-1]
+	vm.stack = vm.stack[:len(vm.stack)-1]
 
-    return result, nil
+	return result, nil
 }
 
 type CallStackEntry struct {
@@ -124,21 +133,22 @@ func (cse CallStackEntry) Print() {
 }
 
 type VM struct {
-	stack []interface{}
-	pc    int
-	code  []compiler.BytecodeInstruction
-	//symbolTable map[string]interface{}
+	stack     []interface{}
+	pc        int
+	code      []compiler.BytecodeInstruction
+	offsetMap map[int]int
 	symbolTableStack []*RuntimeSymbolTable
 	functions        map[string]FunctionMetadata
 	callStack        []CallStackEntry
 }
 
-func NewVM(code []compiler.BytecodeInstruction) *VM {
+func NewVM(code []compiler.BytecodeInstruction, offsetMap map[int]int) *VM {
 	globalSymbolTable := NewRuntimeSymbolTable(nil)
 	return &VM{
 		stack:            make([]interface{}, 0),
 		pc:               0,
 		code:             code,
+		offsetMap:        offsetMap,
 		symbolTableStack: []*RuntimeSymbolTable{globalSymbolTable},
 		functions:        make(map[string]FunctionMetadata),
 		callStack:        make([]CallStackEntry, 0),
@@ -201,20 +211,20 @@ func (vm *VM) pop() (interface{}, error) {
 	return topElement, nil
 }
 
-func (vm *VM) Run(optionalStartAddress ...int) error {
-    var start int
-    if len(optionalStartAddress) > 0 {
-        start = optionalStartAddress[0]
-        vm.pc = start
-    } else {
-        vm.pc = 0
-    }
+func (vm *VM) Run(optionalStartEndAddress ...int) error {
+	start := 0
+	end := len(vm.code)
+	if len(optionalStartEndAddress) == 2 {
+		start = optionalStartEndAddress[0]
+		end = optionalStartEndAddress[1]
+	} else if len(optionalStartEndAddress) == 1 {
+		start = optionalStartEndAddress[0]
+	}
 
-	for vm.pc < len(vm.code) {
+	for vm.pc = start; vm.pc < end; vm.pc++ {
 		instruction := vm.code[vm.pc]
 		fmt.Printf("Executing Instruction at PC %v: Opcode %d, Operands %v\n", vm.pc, instruction.Opcode, instruction.Operands)
 		vm.Print()
-		vm.pc++
 
 		switch instruction.Opcode {
 		case compiler.PUSH_NUMBER:
@@ -431,13 +441,48 @@ func (vm *VM) Run(optionalStartAddress ...int) error {
 			}
 			endAddress := int(binary.LittleEndian.Uint32(endAddressBytes))
 
+			var start int
+			if startIdx, ok := vm.offsetMap[startAddress]; ok {
+				start = startIdx
+			} else {
+				fmt.Printf("start index: %v\n", startIdx)
+				return fmt.Errorf("Invalid start address for lambda")
+			}
+
+			var end int
+			if endIdx, ok := vm.offsetMap[endAddress]; ok {
+				end = endIdx
+			} else {
+				return fmt.Errorf("Invalid end address for lambda")
+			}
+
 			paramCountBytes, ok := instruction.Operands[2].([]byte)
 			if !ok {
 				return fmt.Errorf("Invalid operand type for lambda parameter count")
 			}
 			paramCount := int(binary.LittleEndian.Uint32(paramCountBytes))
+			var paramNames []string
+			ii := 0
 
-			capturedVarCountBytes, ok := instruction.Operands[3].([]byte)
+			for ii < paramCount {
+				paramNameLenBytes, ok := instruction.Operands[3+ii*2].([]byte)
+				if !ok || len(paramNameLenBytes) != 4 {
+					return fmt.Errorf("Invalid or missing length for param name in CREATE_LAMBDA instruction")
+				}
+				paramNameLen := int(binary.LittleEndian.Uint32(paramNameLenBytes))
+
+				paramNameBytes, ok := instruction.Operands[4+ii*2].([]byte)
+				if !ok || len(paramNameBytes) != paramNameLen {
+					return fmt.Errorf("Invalid or missing param name in CREATE_LAMBDA instruction")
+				}
+				paramName := string(paramNameBytes)
+				paramNames = append(paramNames, paramName)
+				ii++
+			}
+			//fmt.Printf("----lambda params: %v\n", paramNames)
+			iii := 4 + (ii-1)*2 + 1
+
+			capturedVarCountBytes, ok := instruction.Operands[iii].([]byte)
 			if !ok {
 				return fmt.Errorf("Invalid operand type for number of captured variables")
 			}
@@ -446,13 +491,13 @@ func (vm *VM) Run(optionalStartAddress ...int) error {
 			var capturedVars []string
 
 			for i := 0; i < capturedVarCount; i++ {
-				varNameLenBytes, ok := instruction.Operands[4+i*2].([]byte)
+				varNameLenBytes, ok := instruction.Operands[(iii+1)+i*2].([]byte)
 				if !ok || len(varNameLenBytes) != 4 {
 					return fmt.Errorf("Invalid or missing length for captured var name in CREATE_LAMBDA instruction")
 				}
 				varNameLen := int(binary.LittleEndian.Uint32(varNameLenBytes))
 
-				varNameBytes, ok := instruction.Operands[5+i*2].([]byte)
+				varNameBytes, ok := instruction.Operands[(iii+2)+i*2].([]byte)
 				if !ok || len(varNameBytes) != varNameLen {
 					return fmt.Errorf("Invalid or missing captured var name in CREATE_LAMBDA instruction")
 				}
@@ -472,16 +517,70 @@ func (vm *VM) Run(optionalStartAddress ...int) error {
 			}
 
 			lambdaFunction := &LambdaFunction{
-				StartAddress: startAddress,
-				EndAddress:   endAddress,
+				StartAddress: start,
+				EndAddress:   end,
 				SymbolTable:  lambdaSymbolTable,
 				ParamCount:   paramCount,
+				ParamNames:   paramNames,
 				CapturedVars: capturedVars,
 			}
 
-			vm.stack = append(vm.stack, lambdaFunction)
+			vm.push(lambdaFunction)
+			//fmt.Printf("current stack after pushing lambda: %v\n", vm.stack)
+			//fmt.Printf("Lambda created with start address %d and end address %d\n", startAddress, endAddress)
+			//lambdaFunction.Print("----")
+		case compiler.CALL_LAMBDA:
+			numArgsBytes, ok := instruction.Operands[0].([]byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand for CALL_LAMBDA instruction")
+			}
+			numArgs := int(binary.LittleEndian.Uint32(numArgsBytes))
+			//fmt.Printf("number of args for lambda: %v\n", numArgs)
+			//fmt.Printf("current vm stack before popping lambda args: %v\n", vm.stack)
+			args := make([]interface{}, numArgs)
+			for i := numArgs - 1; i >= 0; i-- {
+				arg, err := vm.pop()
+				if err != nil {
+					return err
+				}
+				args[i] = arg
+			}
 
-			fmt.Printf("Lambda created with start address %d and end address %d\n", startAddress, endAddress)
+			//fmt.Printf("current vm stack before popping lambda function: %v\n", vm.stack)
+			popped, err1 := vm.pop()
+			lambdaFunc, ok2 := popped.(*LambdaFunction)
+			if (err1 != nil) || !ok2 {
+				return fmt.Errorf("Expected a lambda function on the stack: %v\n", err1)
+			}
+			//fmt.Printf("popped lambda: %v\n", lambdaFunc)
+
+			// captured vars???
+			lambdaSymbolTable := NewRuntimeSymbolTable(lambdaFunc.SymbolTable)
+			for i, paramName := range lambdaFunc.ParamNames {
+				lambdaSymbolTable.Set(paramName, args[i])
+			}
+			//fmt.Printf("lambda symbol table set: \n")
+			//lambdaSymbolTable.Print("----")
+
+			currentPC := vm.pc
+			//currentSymbolTable := vm.symbolTableStack[len(vm.symbolTableStack)-1]
+
+			vm.symbolTableStack = append(vm.symbolTableStack, lambdaSymbolTable)
+
+			//fmt.Printf("----lambda start: %v\tlambda end: %v\n", lambdaFunc.StartAddress, lambdaFunc.EndAddress)
+			err := vm.Run(lambdaFunc.StartAddress, lambdaFunc.EndAddress)
+			if err != nil {
+				return err
+			}
+
+			returnValue := vm.stack[len(vm.stack)-1]
+
+			vm.pc = currentPC
+			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
+
+			vm.push(returnValue)
+
+			return nil
 		case compiler.PUSH_VARIABLE:
 			varNameLenBytes, ok := instruction.Operands[0].([]byte)
 			if !ok || len(varNameLenBytes) != 4 {

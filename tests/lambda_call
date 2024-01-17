@@ -1,0 +1,120 @@
+Input: ((x:int) -> (* x x))(7)
+
+AST: []interface {}{parser.LambdaCall{Lambda:parser.LambdaExpression{Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}}, Body:[]interface {}{[]interface {}{parser.Operator{Value:"*"}, []interface {}{parser.Identifier{Value:"x"}}, []interface {}{[]interface {}{parser.Identifier{Value:"x"}}}}}}, Arguments:[]interface {}{parser.Number{Value:7}}}}
+
+Symbol Table:
+Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Raw Bytecode: [51 3 0 0 0 28 1 0 0 0 120 28 1 0 0 0 120 2 34 5 0 0 0 18 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 120 0 0 0 0 0 0 0 0 29 0 0 0 0 0 0 28 64 35 1 0 0 0]
+Pos: 0	Opcode: 51 JUMP	Operands: [[3 0 0 0]]
+Pos: 1	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
+Pos: 2	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
+Pos: 3	Opcode: 2 MUL	Operands: []
+Pos: 4	Opcode: 34 CREATE_LAMBDA	Operands: [[5 0 0 0] [18 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
+Pos: 5	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 28 64]]
+Pos: 6	Opcode: 35 CALL_LAMBDA	Operands: [[1 0 0 0]]
+
+Initial VM State: 
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
+Executing Instruction at PC 0: Opcode 51, Operands [[3 0 0 0]]
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Current PC: 0	Jump offset: 3
+Updated PC: 3
+Executing Instruction at PC 4: Opcode 34, Operands [[5 0 0 0] [18 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
+VM State:
+  Program Counter: 4
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 5: Opcode 29, Operands [[0 0 0 0 0 0 28 64]]
+VM State:
+  Program Counter: 5
+  Stack: [0x14000104a50]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000104a50 7]
+Executing Instruction at PC 6: Opcode 35, Operands [[1 0 0 0]]
+VM State:
+  Program Counter: 6
+  Stack: [0x14000104a50 7]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 7
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [7]
+Executing Instruction at PC 2: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 2
+  Stack: [7]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 7
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [7 7]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [7 7]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 7
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [49]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Final VM State: 
+VM State:
+  Program Counter: 6
+  Stack: [49 49]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+

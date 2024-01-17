@@ -53,6 +53,11 @@ type LambdaExpression struct {
 	Body   []interface{}
 }
 
+type LambdaCall struct {
+	Lambda    interface{}
+	Arguments []interface{}
+}
+
 type Parser struct {
 	lexer        *lexer.Lexer
 	currentToken lexer.Token
@@ -125,6 +130,7 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			return nil, err
 		}
 		//operands = append(operands, firstOperand)
+		//fmt.Printf("first operand: %v\n", firstOperand)
 
 		var secondOperand []interface{}
 		if !p.peekTokenIs(lexer.RPAREN) && p.peekToken.Type != lexer.EOF {
@@ -136,13 +142,31 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			//operands = append(operands, secondOperand)
 			secondOperand = append(secondOperand, operand)
 		}
+		//fmt.Printf("second operand: %v\n", secondOperand)
 
 		result = append([]interface{}{operator}, []interface{}{firstOperand}, []interface{}{secondOperand})
 	case lexer.LPAREN:
 
 		p.nextToken()
 		if p.isLambdaExpression() {
-			return p.parseLambdaExpression()
+			lambdaExpr, err := p.parseLambdaExpression()
+			if err != nil {
+				return nil, err
+			}
+
+			p.nextToken()
+
+			var args []interface{}
+			for p.peekTokenIs(lexer.NUMBER) || p.peekTokenIs(lexer.IDENT) {
+				p.nextToken()
+				arg, err := p.parseExpression()
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, arg)
+			}
+
+			return LambdaCall{Lambda: lambdaExpr, Arguments: args}, nil
 		} else {
 			return p.parseParenExpression()
 		}
@@ -158,7 +182,6 @@ func (p *Parser) parseExpression() (interface{}, error) {
 }
 
 func (p *Parser) isLambdaExpression() bool {
-
 	nextTwoTokens, _ := p.lexer.PeekAhead(2)
 
 	if len(nextTwoTokens) >= 2 {
@@ -166,7 +189,6 @@ func (p *Parser) isLambdaExpression() bool {
 	}
 
 	return false
-
 }
 
 func (p *Parser) parseLambdaExpression() (interface{}, error) {
@@ -201,6 +223,7 @@ func (p *Parser) parseLambdaExpression() (interface{}, error) {
 		return nil, err
 	}
 	body = append(body, b)
+	p.nextToken()
 
 	return LambdaExpression{Params: params, Body: body}, nil
 }
@@ -233,6 +256,7 @@ func (p *Parser) parseLambdaParams() (TypeAnnotation, error) {
 func (p *Parser) parseOperand() (interface{}, error) {
 	if p.currentToken.Type == lexer.LPAREN {
 		p.nextToken()
+
 		var nestedExpressions []interface{}
 		for p.currentToken.Type != lexer.RPAREN && p.currentToken.Type != lexer.EOF {
 			expr, err := p.parseExpression()
@@ -246,9 +270,10 @@ func (p *Parser) parseOperand() (interface{}, error) {
 			p.nextToken()
 		}
 
-		if p.currentToken.Type != lexer.RPAREN {
+		if p.peekToken.Type != lexer.RPAREN {
 			return nil, fmt.Errorf("expected ')' after nested expression, got %s", p.currentToken.Literal)
 		}
+		p.nextToken()
 
 		return nestedExpressions, nil
 	} else {
