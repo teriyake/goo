@@ -133,10 +133,10 @@ func (cse CallStackEntry) Print() {
 }
 
 type VM struct {
-	stack     []interface{}
-	pc        int
-	code      []compiler.BytecodeInstruction
-	offsetMap map[int]int
+	stack            []interface{}
+	pc               int
+	code             []compiler.BytecodeInstruction
+	offsetMap        map[int]int
 	symbolTableStack []*RuntimeSymbolTable
 	functions        map[string]FunctionMetadata
 	callStack        []CallStackEntry
@@ -562,8 +562,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			//fmt.Printf("lambda symbol table set: \n")
 			//lambdaSymbolTable.Print("----")
 
-			currentPC := vm.pc
 			//currentSymbolTable := vm.symbolTableStack[len(vm.symbolTableStack)-1]
+
+			returnAddress := vm.pc
 
 			vm.symbolTableStack = append(vm.symbolTableStack, lambdaSymbolTable)
 
@@ -575,12 +576,12 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			returnValue := vm.stack[len(vm.stack)-1]
 
-			vm.pc = currentPC
+			vm.pc = returnAddress
 			vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
 
 			vm.push(returnValue)
 
-			return nil
+			//return nil
 		case compiler.PUSH_VARIABLE:
 			varNameLenBytes, ok := instruction.Operands[0].([]byte)
 			if !ok || len(varNameLenBytes) != 4 {
@@ -728,6 +729,41 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			fmt.Printf("Returning to address %d with value %v\n", vm.pc, returnValue)
 			continue
+
+		case compiler.MAP:
+
+			numArgs := int(binary.LittleEndian.Uint32(instruction.Operands[0].([]byte)))
+
+			args := make([]interface{}, numArgs)
+			for i := numArgs - 1; i >= 0; i-- {
+				arg, err := vm.pop()
+				if err != nil {
+					return fmt.Errorf("error executing MAP: %v", err)
+				}
+				args[i] = arg
+			}
+
+			lambdaFuncInterface, err := vm.pop()
+			if err != nil {
+				return fmt.Errorf("error executing MAP: %v", err)
+			}
+			lambdaFunc, ok := lambdaFuncInterface.(*LambdaFunction)
+			if !ok {
+				return fmt.Errorf("error executing MAP: expected a lambda function")
+			}
+
+			results := make([]interface{}, numArgs)
+			for i, arg := range args {
+				result, err := vm.executeLambda(lambdaFunc, []interface{}{arg})
+				if err != nil {
+					return fmt.Errorf("error executing MAP with lambda: %v", err)
+				}
+				results[i] = result
+			}
+
+			vm.push(results)
+
+			//return nil
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("JUMP instruction requires an operand")
@@ -772,6 +808,37 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 	fmt.Printf("Exiting VM...\n")
 	fmt.Println()
 	return nil
+}
+
+func (vm *VM) executeLambda(lambdaFunc *LambdaFunction, args []interface{}) (interface{}, error) {
+	if len(args) != lambdaFunc.ParamCount {
+		return nil, fmt.Errorf("lambda function expected %d arguments, got %d", lambdaFunc.ParamCount, len(args))
+	}
+
+	savedPC := vm.pc
+
+	lambdaSymbolTable := NewRuntimeSymbolTable(lambdaFunc.SymbolTable)
+	for i, paramName := range lambdaFunc.ParamNames {
+		lambdaSymbolTable.Set(paramName, args[i])
+	}
+	vm.symbolTableStack = append(vm.symbolTableStack, lambdaSymbolTable)
+
+	vm.pc = lambdaFunc.StartAddress
+	err := vm.Run(lambdaFunc.StartAddress, lambdaFunc.EndAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	var returnValue interface{}
+	if len(vm.stack) > 0 {
+		returnValue = vm.stack[len(vm.stack)-1]
+		vm.stack = vm.stack[:len(vm.stack)-1]
+	}
+
+	vm.pc = savedPC
+	vm.symbolTableStack = vm.symbolTableStack[:len(vm.symbolTableStack)-1]
+
+	return returnValue, nil
 }
 
 func (vm *VM) jumpToOpcode(opcode compiler.Opcode) {

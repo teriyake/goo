@@ -10,8 +10,11 @@ import (
 )
 
 func main() {
+	gooCode := "(print(map ((x:int) -> (* x 2)) (1 2 3 4 5)))"
+	//gooCode := "print(((x:int) -> (if (> x 0) 'positive' else ('negative')))(2))"
+	//gooCode := "print(((a:int b:int c:int) -> (+ (* a b) (* a c)))(2 3 4))"
 	//gooCode := "((x:int y:int) -> (* (+ y x) x))(3 5)"
-	gooCode := "((x:int) -> (* x x))(7)"
+	//gooCode := "print(((x:int) -> (* x x))(7))"
 	//gooCode := "(let x:int 3) (print (- x 1))"
 	//gooCode := "(def factorial (x:int) (if (= x 0) (ret 1) else (ret (* x factorial(- x 1))))) (print (factorial(5)))"
 	//gooCode := "(def double (x: int) (ret (* x 2))) (print (double(7)))"

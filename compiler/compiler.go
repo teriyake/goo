@@ -34,6 +34,7 @@ const (
 	RETURN
 	JUMP
 	CALL_FUNCTION
+	MAP = iota + 40
 )
 
 func OpcodeToString(op Opcode) string {
@@ -61,6 +62,7 @@ func OpcodeToString(op Opcode) string {
 		RETURN:          "RETURN",
 		JUMP:            "JUMP",
 		CALL_FUNCTION:   "CALL_FUNCTION",
+		MAP:             "MAP",
 	}
 
 	return opcodeStrings[op]
@@ -343,9 +345,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 					if err := c.compileNode(arg); err != nil {
 						return err
 					}
-					fmt.Printf("===compiled arg: %v\n", arg)
 				}
-				fmt.Printf("=======compiling func call: %v\n", symbol)
 				c.emit(CALL_FUNCTION, funcNameNode.Value)
 				return nil
 			}
@@ -453,7 +453,7 @@ func (c *Compiler) compileNode(node interface{}) error {
 		c.enterScope()
 
 		for i, param := range lambdaExpr.Params {
-        paramNames[i] = param.Variable
+			paramNames[i] = param.Variable
 			c.symbolTable.DefineVariable(param.Variable, ParseDataType(param.Type))
 		}
 
@@ -500,11 +500,32 @@ func (c *Compiler) compileNode(node interface{}) error {
 		c.emit(CALL_LAMBDA, len(lambdaCall.Arguments))
 
 		return nil
+	case parser.MapExpression:
+		return c.compileMapExpression(n)
+
 	default:
 		return fmt.Errorf("unknown node type: %T", n)
 	}
 
 	//fmt.Println("Exiting compileNode")
+	return nil
+}
+
+func (c *Compiler) compileMapExpression(mapExpr parser.MapExpression) error {
+	err := c.compileNode(mapExpr.Lambda)
+	if err != nil {
+		return fmt.Errorf("error compiling lambda in map expression: %v", err)
+	}
+
+	for _, arg := range mapExpr.Arguments {
+		err := c.compileNode(arg)
+		if err != nil {
+			return fmt.Errorf("error compiling argument in map expression: %v", err)
+		}
+	}
+
+	c.emit(MAP, len(mapExpr.Arguments))
+
 	return nil
 }
 
@@ -716,7 +737,7 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, map[int]int, er
 	var instructions []BytecodeInstruction
 	offsetToInstructionIndex := make(map[int]int)
 	i := 0
-    currentOffset := 0
+	currentOffset := 0
 
 	for i < len(rawBytecode) {
 		offsetToInstructionIndex[currentOffset] = len(instructions)
@@ -990,6 +1011,15 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, map[int]int, er
 			operands = append(operands, argLenBytes)
 			i += 4
 			currentOffset += 4
+		case MAP:
+			if i+4 > len(rawBytecode) {
+				return nil, nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+			}
+			argLenBytes := rawBytecode[i : i+4]
+			operands = append(operands, argLenBytes)
+			i += 4
+			currentOffset += 4
+
 		default:
 			// Opcodes without operands
 		}

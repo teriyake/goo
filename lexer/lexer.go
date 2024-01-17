@@ -102,22 +102,22 @@ func (l *Lexer) NextToken() Token {
 }
 
 func (l *Lexer) PeekAhead(n int) ([]Token, error) {
-    savedPosition := l.position
-    savedReadPosition := l.readPosition
-    savedChar := l.ch
+	savedPosition := l.position
+	savedReadPosition := l.readPosition
+	savedChar := l.ch
 
-    var tokens []Token
-    for i := 0; i < n; i++ {
-        token := l.NextToken()
-        tokens = append(tokens, token)
-        if token.Type == EOF {
-            break
-        }
-    }
+	var tokens []Token
+	for i := 0; i < n; i++ {
+		token := l.NextToken()
+		tokens = append(tokens, token)
+		if token.Type == EOF {
+			break
+		}
+	}
 
-    l.position = savedPosition
-    l.readPosition = savedReadPosition
-    l.ch = savedChar
+	l.position = savedPosition
+	l.readPosition = savedReadPosition
+	l.ch = savedChar
 
-    return tokens, nil
+	return tokens, nil
 }

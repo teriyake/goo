@@ -58,6 +58,11 @@ type LambdaCall struct {
 	Arguments []interface{}
 }
 
+type MapExpression struct {
+	Lambda    interface{}
+	Arguments []interface{}
+}
+
 type Parser struct {
 	lexer        *lexer.Lexer
 	currentToken lexer.Token
@@ -95,8 +100,8 @@ func (p *Parser) parseExpression() (interface{}, error) {
 		} else if p.currentToken.Literal == "let" {
 			p.nextToken()
 			return p.parseVariableDefinition()
-		} else if p.currentToken.Literal == "lambda" {
-			return p.parseLambdaExpression()
+		} else if p.currentToken.Literal == "map" {
+			return p.parseMapExpression()
 		} else if p.peekTokenIs(lexer.LPAREN) {
 			return p.parseFunctionCall()
 		} else {
@@ -146,8 +151,10 @@ func (p *Parser) parseExpression() (interface{}, error) {
 
 		result = append([]interface{}{operator}, []interface{}{firstOperand}, []interface{}{secondOperand})
 	case lexer.LPAREN:
-
 		p.nextToken()
+		if p.currentToken.Literal == "map" {
+			return p.parseMapExpression()
+		}
 		if p.isLambdaExpression() {
 			lambdaExpr, err := p.parseLambdaExpression()
 			if err != nil {
@@ -251,6 +258,55 @@ func (p *Parser) parseLambdaParams() (TypeAnnotation, error) {
 		Variable: varName,
 		Type:     varType,
 	}, nil
+}
+
+func (p *Parser) parseMapExpression() (interface{}, error) {
+	p.nextToken()
+	p.nextToken()
+
+	lambdaExpr, err := p.parseLambdaExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	args, err := p.parseExpressionList()
+	if err != nil {
+		return nil, err
+	}
+
+	return MapExpression{
+		Lambda:    lambdaExpr,
+		Arguments: args,
+	}, nil
+}
+
+func (p *Parser) parseExpressionList() ([]interface{}, error) {
+	var expressions []interface{}
+
+	if !p.expectPeek(lexer.LPAREN) {
+		return nil, fmt.Errorf("expected '(' to start an expression list, got %s", p.peekToken.Literal)
+	}
+
+	p.nextToken()
+
+	for !p.currentTokenIs(lexer.RPAREN) && !p.currentTokenIs(lexer.EOF) {
+		expr, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+
+		if expr != nil {
+			expressions = append(expressions, expr)
+		}
+
+		p.nextToken()
+	}
+
+	if !p.expectPeek(lexer.RPAREN) {
+		return nil, fmt.Errorf("expected ')' at the end of expression list, got %s", p.currentToken.Literal)
+	}
+
+	return expressions, nil
 }
 
 func (p *Parser) parseOperand() (interface{}, error) {

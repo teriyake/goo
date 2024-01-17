@@ -1,19 +1,23 @@
-Input: ((x:int y:int z:int) -> (* y x))
+Input: print(((x:int) -> (if (> x 0) 'positive' else ('negative')))(2))
 
-AST: []interface {}{parser.LambdaExpression{Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}, parser.TypeAnnotation{Variable:"y", Type:"int"}, parser.TypeAnnotation{Variable:"z", Type:"int"}}, Body:[]interface {}{[]interface {}{parser.Operator{Value:"*"}, []interface {}{parser.Identifier{Value:"y"}}, []interface {}{[]interface {}{parser.Identifier{Value:"x"}}}}}}}
+AST: []interface {}{[]interface {}{parser.Identifier{Value:"print"}, []interface {}{parser.LambdaCall{Lambda:parser.LambdaExpression{Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}}, Body:[]interface {}{parser.IfStatement{Condition:[]interface {}{parser.Operator{Value:">"}, []interface {}{parser.Identifier{Value:"x"}}, []interface {}{[]interface {}{parser.Number{Value:0}}}}, ThenBlock:parser.String{Value:"'positive'"}, ElseBlock:[]interface {}{parser.String{Value:"'negative'"}}}}}, Arguments:[]interface {}{parser.Number{Value:2}}}}}}
 
-Symbol Table before capturing lambda variables: 
 Symbol Table:
 Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
-Name: y, Type: %!s(compiler.SymbolType=0), Start Address: 0
-Name: z, Type: %!s(compiler.SymbolType=0), Start Address: 0
-Captured lambda variables: []
-Raw Bytecode: [50 3 0 0 0 28 1 0 0 0 121 28 1 0 0 0 120 2 34 5 0 0 0 18 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0]
-Pos: 0	Opcode: 50 JUMP	Operands: [[3 0 0 0]]
-Pos: 1	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [121]]
-Pos: 2	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
-Pos: 3	Opcode: 2 MUL	Operands: []
-Pos: 4	Opcode: 34 CREATE_LAMBDA	Operands: [[5 0 0 0] [18 0 0 0] [3 0 0 0] [0 0 0 0]]
+Raw Bytecode: [51 8 0 0 0 28 1 0 0 0 120 29 0 0 0 0 0 0 0 0 4 46 31 8 0 0 0 112 111 115 105 116 105 118 101 47 31 8 0 0 0 110 101 103 97 116 105 118 101 48 34 5 0 0 0 50 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 120 0 0 0 0 0 0 0 0 29 0 0 0 0 0 0 0 64 35 1 0 0 0 49]
+Pos: 0	Opcode: 51 JUMP	Operands: [[8 0 0 0]]
+Pos: 1	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
+Pos: 2	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 0 0]]
+Pos: 3	Opcode: 4 GRT	Operands: []
+Pos: 4	Opcode: 46 IF	Operands: []
+Pos: 5	Opcode: 31 PUSH_STRING	Operands: [[8 0 0 0] [112 111 115 105 116 105 118 101]]
+Pos: 6	Opcode: 47 ELSE	Operands: []
+Pos: 7	Opcode: 31 PUSH_STRING	Operands: [[8 0 0 0] [110 101 103 97 116 105 118 101]]
+Pos: 8	Opcode: 48 ENDIF	Operands: []
+Pos: 9	Opcode: 34 CREATE_LAMBDA	Operands: [[5 0 0 0] [50 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
+Pos: 10	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 0 64]]
+Pos: 11	Opcode: 35 CALL_LAMBDA	Operands: [[1 0 0 0]]
+Pos: 12	Opcode: 49 PRINT	Operands: []
 
 Initial VM State: 
 VM State:
@@ -25,7 +29,7 @@ VM State:
   Call Stack:
     EMPTY
 
-Executing Instruction at PC 0: Opcode 50, Operands [[3 0 0 0]]
+Executing Instruction at PC 0: Opcode 51, Operands [[8 0 0 0]]
 VM State:
   Program Counter: 0
   Stack: []
@@ -34,26 +38,144 @@ VM State:
   Function Metadata:
   Call Stack:
     EMPTY
-Current PC: 1	Jump offset: 3
-Updated PC: 4
-Executing Instruction at PC 4: Opcode 34, Operands [[5 0 0 0] [18 0 0 0] [3 0 0 0] [0 0 0 0]]
+Current PC: 0	Jump offset: 8
+Updated PC: 8
+Executing Instruction at PC 9: Opcode 34, Operands [[5 0 0 0] [50 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
 VM State:
-  Program Counter: 4
+  Program Counter: 9
   Stack: []
   Symbol Table Stack:
     Symbol Table:
   Function Metadata:
   Call Stack:
     EMPTY
-Lambda created with start address 5 and end address 18
+Executing Instruction at PC 10: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 10
+  Stack: [0x14000105e00]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000105e00 2]
+Executing Instruction at PC 11: Opcode 35, Operands [[1 0 0 0]]
+VM State:
+  Program Counter: 11
+  Stack: [0x14000105e00 2]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [2]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 0]]
+VM State:
+  Program Counter: 2
+  Stack: [2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [2 0]
+Executing Instruction at PC 3: Opcode 4, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [2 0]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after GRT: [true]
+Executing Instruction at PC 4: Opcode 46, Operands []
+VM State:
+  Program Counter: 4
+  Stack: [true]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 5: Opcode 31, Operands [[8 0 0 0] [112 111 115 105 116 105 118 101]]
+VM State:
+  Program Counter: 5
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_STRING: [positive]
+Executing Instruction at PC 6: Opcode 47, Operands []
+VM State:
+  Program Counter: 6
+  Stack: [positive]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
 
-All instructions executed. Last executed instruction PC: 5
+All instructions executed. Last executed instruction PC: 10
+Exiting VM...
+
+Executing Instruction at PC 12: Opcode 49, Operands []
+VM State:
+  Program Counter: 12
+  Stack: [positive positive]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
+------------
+| positive |
+------------
+
+
+All instructions executed. Last executed instruction PC: 13
 Exiting VM...
 
 Final VM State: 
 VM State:
-  Program Counter: 5
-  Stack: [0x1400011c880]
+  Program Counter: 13
+  Stack: [positive]
   Symbol Table Stack:
     Symbol Table:
   Function Metadata:

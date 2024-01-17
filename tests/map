@@ -1,0 +1,348 @@
+Input: (map ((x:int) -> (* x 2)) (1 2 3 4 5))
+
+AST: []interface {}{parser.MapExpression{Lambda:parser.LambdaExpression{Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}}, Body:[]interface {}{[]interface {}{parser.Operator{Value:"*"}, []interface {}{parser.Identifier{Value:"x"}}, []interface {}{[]interface {}{parser.Number{Value:2}}}}}}, Arguments:[]interface {}{parser.Number{Value:1}, parser.Number{Value:2}, parser.Number{Value:3}, parser.Number{Value:4}, parser.Number{Value:5}}}}
+
+Symbol Table:
+Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Raw Bytecode: [51 3 0 0 0 28 1 0 0 0 120 29 0 0 0 0 0 0 0 64 2 34 5 0 0 0 21 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 120 0 0 0 0 0 0 0 0 29 0 0 0 0 0 0 240 63 29 0 0 0 0 0 0 0 64 29 0 0 0 0 0 0 8 64 29 0 0 0 0 0 0 16 64 29 0 0 0 0 0 0 20 64 63 5 0 0 0]
+Pos: 0	Opcode: 51 JUMP	Operands: [[3 0 0 0]]
+Pos: 1	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
+Pos: 2	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 0 64]]
+Pos: 3	Opcode: 2 MUL	Operands: []
+Pos: 4	Opcode: 34 CREATE_LAMBDA	Operands: [[5 0 0 0] [21 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
+Pos: 5	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 240 63]]
+Pos: 6	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 0 64]]
+Pos: 7	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 8 64]]
+Pos: 8	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 16 64]]
+Pos: 9	Opcode: 29 PUSH_NUMBER	Operands: [[0 0 0 0 0 0 20 64]]
+Pos: 10	Opcode: 63 MAP	Operands: [[5 0 0 0]]
+
+Initial VM State: 
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
+Executing Instruction at PC 0: Opcode 51, Operands [[3 0 0 0]]
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Current PC: 0	Jump offset: 3
+Updated PC: 3
+Executing Instruction at PC 4: Opcode 34, Operands [[5 0 0 0] [21 0 0 0] [1 0 0 0] [1 0 0 0] [120] [0 0 0 0]]
+VM State:
+  Program Counter: 4
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 5: Opcode 29, Operands [[0 0 0 0 0 0 240 63]]
+VM State:
+  Program Counter: 5
+  Stack: [0x14000102d70]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000102d70 1]
+Executing Instruction at PC 6: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 6
+  Stack: [0x14000102d70 1]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000102d70 1 2]
+Executing Instruction at PC 7: Opcode 29, Operands [[0 0 0 0 0 0 8 64]]
+VM State:
+  Program Counter: 7
+  Stack: [0x14000102d70 1 2]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000102d70 1 2 3]
+Executing Instruction at PC 8: Opcode 29, Operands [[0 0 0 0 0 0 16 64]]
+VM State:
+  Program Counter: 8
+  Stack: [0x14000102d70 1 2 3]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000102d70 1 2 3 4]
+Executing Instruction at PC 9: Opcode 29, Operands [[0 0 0 0 0 0 20 64]]
+VM State:
+  Program Counter: 9
+  Stack: [0x14000102d70 1 2 3 4]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [0x14000102d70 1 2 3 4 5]
+Executing Instruction at PC 10: Opcode 63, Operands [[5 0 0 0]]
+VM State:
+  Program Counter: 10
+  Stack: [0x14000102d70 1 2 3 4 5]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 1
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [1]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [1]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 1
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [1 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [1 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 1
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [2]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [2]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [2 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [2 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 2
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [4]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 3
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [3]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [3]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 3
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [3 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [3 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 3
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [6]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 4
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [4]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [4]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 4
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [4 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [4 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 4
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [8]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Executing Instruction at PC 1: Opcode 28, Operands [[1 0 0 0] [120]]
+VM State:
+  Program Counter: 1
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 5
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_VARIABLE (x): [5]
+Executing Instruction at PC 2: Opcode 29, Operands [[0 0 0 0 0 0 0 64]]
+VM State:
+  Program Counter: 2
+  Stack: [5]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 5
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after PUSH_NUMBER: [5 2]
+Executing Instruction at PC 3: Opcode 2, Operands []
+VM State:
+  Program Counter: 3
+  Stack: [5 2]
+  Symbol Table Stack:
+    Symbol Table:
+    Symbol Table:
+      x: 5
+    Parent:
+      Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Stack after MUL: [10]
+
+All instructions executed. Last executed instruction PC: 4
+Exiting VM...
+
+Final VM State: 
+VM State:
+  Program Counter: 10
+  Stack: [[2 4 6 8 10]]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
