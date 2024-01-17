@@ -1,0 +1,62 @@
+Input: ((x:int y:int z:int) -> (* y x))
+
+AST: []interface {}{parser.LambdaExpression{Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"int"}, parser.TypeAnnotation{Variable:"y", Type:"int"}, parser.TypeAnnotation{Variable:"z", Type:"int"}}, Body:[]interface {}{[]interface {}{parser.Operator{Value:"*"}, []interface {}{parser.Identifier{Value:"y"}}, []interface {}{[]interface {}{parser.Identifier{Value:"x"}}}}}}}
+
+Symbol Table before capturing lambda variables: 
+Symbol Table:
+Name: x, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Name: y, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Name: z, Type: %!s(compiler.SymbolType=0), Start Address: 0
+Captured lambda variables: []
+Raw Bytecode: [50 3 0 0 0 28 1 0 0 0 121 28 1 0 0 0 120 2 34 5 0 0 0 18 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0]
+Pos: 0	Opcode: 50 JUMP	Operands: [[3 0 0 0]]
+Pos: 1	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [121]]
+Pos: 2	Opcode: 28 PUSH_VARIABLE	Operands: [[1 0 0 0] [120]]
+Pos: 3	Opcode: 2 MUL	Operands: []
+Pos: 4	Opcode: 34 CREATE_LAMBDA	Operands: [[5 0 0 0] [18 0 0 0] [3 0 0 0] [0 0 0 0]]
+
+Initial VM State: 
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+
+Executing Instruction at PC 0: Opcode 50, Operands [[3 0 0 0]]
+VM State:
+  Program Counter: 0
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Current PC: 1	Jump offset: 3
+Updated PC: 4
+Executing Instruction at PC 4: Opcode 34, Operands [[5 0 0 0] [18 0 0 0] [3 0 0 0] [0 0 0 0]]
+VM State:
+  Program Counter: 4
+  Stack: []
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+Lambda created with start address 5 and end address 18
+
+All instructions executed. Last executed instruction PC: 5
+Exiting VM...
+
+Final VM State: 
+VM State:
+  Program Counter: 5
+  Stack: [0x1400011c880]
+  Symbol Table Stack:
+    Symbol Table:
+  Function Metadata:
+  Call Stack:
+    EMPTY
+

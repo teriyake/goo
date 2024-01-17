@@ -48,6 +48,11 @@ type ReturnStatement struct {
 	ReturnValue interface{}
 }
 
+type LambdaExpression struct {
+	Params []TypeAnnotation
+	Body   []interface{}
+}
+
 type Parser struct {
 	lexer        *lexer.Lexer
 	currentToken lexer.Token
@@ -85,6 +90,8 @@ func (p *Parser) parseExpression() (interface{}, error) {
 		} else if p.currentToken.Literal == "let" {
 			p.nextToken()
 			return p.parseVariableDefinition()
+		} else if p.currentToken.Literal == "lambda" {
+			return p.parseLambdaExpression()
 		} else if p.peekTokenIs(lexer.LPAREN) {
 			return p.parseFunctionCall()
 		} else {
@@ -132,8 +139,13 @@ func (p *Parser) parseExpression() (interface{}, error) {
 
 		result = append([]interface{}{operator}, []interface{}{firstOperand}, []interface{}{secondOperand})
 	case lexer.LPAREN:
+
 		p.nextToken()
-		return p.parseParenExpression()
+		if p.isLambdaExpression() {
+			return p.parseLambdaExpression()
+		} else {
+			return p.parseParenExpression()
+		}
 	case lexer.RPAREN:
 		p.nextToken()
 		return nil, nil
@@ -143,6 +155,79 @@ func (p *Parser) parseExpression() (interface{}, error) {
 
 	//fmt.Printf("parseExpression - End, Parsed: %+v\n", result)
 	return result, err
+}
+
+func (p *Parser) isLambdaExpression() bool {
+
+	nextTwoTokens, _ := p.lexer.PeekAhead(2)
+
+	if len(nextTwoTokens) >= 2 {
+		return nextTwoTokens[0].Type == lexer.COLON && nextTwoTokens[1].Type == lexer.IDENT
+	}
+
+	return false
+
+}
+
+func (p *Parser) parseLambdaExpression() (interface{}, error) {
+	if p.currentToken.Type != lexer.LPAREN {
+		return nil, fmt.Errorf("expected '(' at the beginning of lambda parameters")
+	}
+
+	var params []TypeAnnotation
+	p.nextToken()
+	for !p.currentTokenIs(lexer.RPAREN) && !p.peekTokenIs(lexer.EOF) {
+		param, err := p.parseLambdaParams()
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, param)
+
+		p.nextToken()
+	}
+
+	if !p.currentTokenIs(lexer.RPAREN) {
+		return nil, fmt.Errorf("expected ')' after lambda parameters")
+	}
+
+	if !p.expectPeek(lexer.LAMBDA) {
+		return nil, fmt.Errorf("expected '->' after lambda parameters")
+	}
+
+	var body []interface{}
+	p.nextToken()
+	b, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	body = append(body, b)
+
+	return LambdaExpression{Params: params, Body: body}, nil
+}
+
+func (p *Parser) parseLambdaParams() (TypeAnnotation, error) {
+	if p.currentToken.Type != lexer.IDENT {
+		return TypeAnnotation{}, fmt.Errorf("expected variable name, got %s", p.currentToken.Literal)
+	}
+
+	varName := p.currentToken.Literal
+
+	p.nextToken()
+	if p.currentToken.Type != lexer.COLON {
+		return TypeAnnotation{}, fmt.Errorf("expected ':' after variable name, got %s", p.currentToken.Literal)
+	}
+
+	p.nextToken()
+	if p.currentToken.Type != lexer.IDENT {
+		return TypeAnnotation{}, fmt.Errorf("expected variable type identifier after ':', got %s", p.currentToken.Literal)
+	}
+
+	varType := p.currentToken.Literal
+
+	return TypeAnnotation{
+		Variable: varName,
+		Type:     varType,
+	}, nil
 }
 
 func (p *Parser) parseOperand() (interface{}, error) {
@@ -255,6 +340,25 @@ func (p *Parser) peekTokenIs(t string) bool {
 	return p.peekToken.Type == t
 }
 
+func (p *Parser) parseLambdaExpression2() (LambdaExpression, error) {
+	p.nextToken()
+
+	params, err := p.parseFunctionParameters()
+	if err != nil {
+		return LambdaExpression{}, err
+	}
+
+	p.nextToken()
+	var body []interface{}
+	b, err := p.parseExpression()
+	if err != nil {
+		return LambdaExpression{}, err
+	}
+	body = append(body, b)
+
+	return LambdaExpression{Params: params, Body: body}, nil
+}
+
 func (p *Parser) parseFunctionDefinition() (interface{}, error) {
 	p.nextToken()
 
@@ -297,20 +401,17 @@ func (p *Parser) parseFunctionDefinition() (interface{}, error) {
 }
 
 func (p *Parser) parseVariableDefinition() (TypeAnnotation, error) {
-	// Ensure the current token is an identifier for the variable name
 	if p.currentToken.Type != lexer.IDENT {
 		return TypeAnnotation{}, fmt.Errorf("expected variable name, got %s", p.currentToken.Literal)
 	}
 
 	varName := p.currentToken.Literal
 
-	// Move to the next token, which should be a colon before the type
 	p.nextToken()
 	if p.currentToken.Type != lexer.COLON {
 		return TypeAnnotation{}, fmt.Errorf("expected ':' after variable name, got %s", p.currentToken.Literal)
 	}
 
-	// Move to the type identifier
 	p.nextToken()
 	if p.currentToken.Type != lexer.IDENT {
 		return TypeAnnotation{}, fmt.Errorf("expected variable type identifier after ':', got %s", p.currentToken.Literal)

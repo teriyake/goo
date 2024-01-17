@@ -25,6 +25,7 @@ const (
 	PUSH_STRING
 	DEFINE_VARIABLE
 	DEFINE_FUNCTION
+	CREATE_LAMBDA
 	IF Opcode = iota + 30
 	ELSE
 	ENDIF
@@ -36,27 +37,28 @@ const (
 
 func OpcodeToString(op Opcode) string {
 	opcodeStrings := map[Opcode]string{
-		ADD:            "ADD",
-		SUB:            "SUB",
-		MUL:            "MUL",
-		DIV:            "DIV",
-		GRT:            "GRT",
-		LESS:           "LESS",
-		EQ:             "EQ",
-		NEQ:            "NEQ",
-		PUSH_VARIABLE:  "PUSH_VARIABLE",
-		PUSH_NUMBER:    "PUSH_NUMBER",
-		PUSH_BOOL:      "PUSH_BOOL",
-		PUSH_STRING:    "PUSH_STRING",
+		ADD:             "ADD",
+		SUB:             "SUB",
+		MUL:             "MUL",
+		DIV:             "DIV",
+		GRT:             "GRT",
+		LESS:            "LESS",
+		EQ:              "EQ",
+		NEQ:             "NEQ",
+		PUSH_VARIABLE:   "PUSH_VARIABLE",
+		PUSH_NUMBER:     "PUSH_NUMBER",
+		PUSH_BOOL:       "PUSH_BOOL",
+		PUSH_STRING:     "PUSH_STRING",
 		DEFINE_VARIABLE: "DEFINE_VARIABLE",
 		DEFINE_FUNCTION: "DEFINE_FUNCTION",
-		IF:             "IF",
-		ELSE:           "ELSE",
-		ENDIF:          "ENDIF",
-		PRINT:          "PRINT",
-		RETURN:         "RETURN",
-		JUMP:           "JUMP",
-		CALL_FUNCTION:  "CALL_FUNCTION",
+		CREATE_LAMBDA:   "CREATE_LAMBDA",
+		IF:              "IF",
+		ELSE:            "ELSE",
+		ENDIF:           "ENDIF",
+		PRINT:           "PRINT",
+		RETURN:          "RETURN",
+		JUMP:            "JUMP",
+		CALL_FUNCTION:   "CALL_FUNCTION",
 	}
 
 	return opcodeStrings[op]
@@ -170,6 +172,11 @@ func (st *SymbolTable) ResolveLocal(funcName, name string) (Symbol, bool) {
 		return st.Parent.ResolveLocal(funcName, name)
 	}
 	return Symbol{}, false
+}
+
+func (st *SymbolTable) IsLocal(name string) bool {
+	_, found := st.Symbols[name]
+	return found
 }
 
 func (st *SymbolTable) IsFunction(name string) bool {
@@ -436,6 +443,42 @@ func (c *Compiler) compileNode(node interface{}) error {
 		}
 		c.emit(RETURN)
 		return nil
+	case parser.LambdaExpression:
+		lambdaExpr := node.(parser.LambdaExpression)
+
+		jumpInstructionIndex := len(c.bytecode)
+		c.emit(JUMP, 0)
+		c.enterScope()
+
+		for _, param := range lambdaExpr.Params {
+			c.symbolTable.DefineVariable(param.Variable, ParseDataType(param.Type))
+		}
+
+		startAddress := len(c.bytecode)
+		for _, expr := range lambdaExpr.Body {
+			err := c.compileNode(expr)
+			if err != nil {
+				return err
+			}
+		}
+		endAddress := len(c.bytecode)
+		jumpOffset := len(c.bytecode) - jumpInstructionIndex
+		correctOffset := calculateCorrectedOffset(c.bytecode, jumpOffset) - 1
+		updateJumpInstruction(c.bytecode, jumpInstructionIndex, correctOffset)
+
+		fmt.Printf("Symbol Table before capturing lambda variables: \n")
+		c.symbolTable.Print()
+		capturedVariables, err := c.determineCapturedVariables(lambdaExpr.Body, lambdaExpr.Params)
+		if err != nil {
+			return fmt.Errorf("Error capturing lambda variables: %v\n", err)
+		}
+		fmt.Printf("Captured lambda variables: %v\n", capturedVariables)
+
+		c.emit(CREATE_LAMBDA, startAddress, endAddress, len(lambdaExpr.Params), len(capturedVariables), capturedVariables)
+
+		c.leaveScope()
+
+		return nil
 	default:
 		return fmt.Errorf("unknown node type: %T", n)
 	}
@@ -611,6 +654,42 @@ func updateJumpInstruction(bytecode []byte, jumpIndex int, correctedOffset int) 
 	copy(bytecode[jumpIndex+1:], offsetBytes)
 }
 
+func (c *Compiler) determineCapturedVariables(lambdaBody []interface{}, lambdaParams []parser.TypeAnnotation) ([]string, error) {
+    captured := make(map[string]bool)
+    var err error
+
+    paramNames := make(map[string]bool)
+    for _, param := range lambdaParams {
+        paramNames[param.Variable] = true
+    }
+
+    var visitNode func(node interface{})
+    visitNode = func(node interface{}) {
+        switch n := node.(type) {
+        case parser.Identifier:
+            symbol, found := c.symbolTable.Resolve(n.Value)
+            if found && symbol.Type == VariableSymbol && !paramNames[n.Value] {
+                captured[n.Value] = true
+            }
+        case []interface{}:
+            for _, elem := range n {
+                visitNode(elem)
+            }
+        }
+    }
+
+    for _, expr := range lambdaBody {
+        visitNode(expr)
+    }
+
+    var capturedVars []string
+    for varName := range captured {
+        capturedVars = append(capturedVars, varName)
+    }
+
+    return capturedVars, err
+}
+
 func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 	fmt.Printf("Raw Bytecode: %v\n", rawBytecode)
 	var instructions []BytecodeInstruction
@@ -765,6 +844,62 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, error) {
 			jumpOffsetBytes := rawBytecode[i : i+4]
 			i += 4
 			operands = append(operands, jumpOffsetBytes)
+		case CREATE_LAMBDA:
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for lambda start address")
+			}
+			startAddressBytes := rawBytecode[i : i+4]
+			operands = append(operands, startAddressBytes)
+			i += 4
+
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for lambda end address")
+			}
+			endAddressBytes := rawBytecode[i : i+4]
+			operands = append(operands, endAddressBytes)
+			i += 4
+
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for number of lambda params")
+			}
+			numParamBytes := rawBytecode[i : i+4]
+			operands = append(operands, numParamBytes)
+			i += 4
+
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for number of captured variables")
+			}
+			numCapturedBytes := rawBytecode[i : i+4]
+			numCaptured := int(binary.LittleEndian.Uint32(numCapturedBytes))
+			operands = append(operands, numCapturedBytes)
+			i += 4
+
+			if i+4 > len(rawBytecode) {
+				return nil, fmt.Errorf("invalid bytecode, unexpected end of data for slice length of captured variables")
+			}
+			/*
+				numCapturedSliceLenBytes := rawBytecode[i : i+4]
+				numCapturedSliceLen := int(binary.LittleEndian.Uint32(numCapturedSliceLenBytes))
+				operands = append(operands, numCapturedBytes)
+			*/
+			i += 4
+
+			for j := 0; j < numCaptured; j++ {
+				if i+4 > len(rawBytecode) {
+					return nil, fmt.Errorf("invalid bytecode, unexpected end of data for captured variable name length")
+				}
+				varNameLenBytes := rawBytecode[i : i+4]
+				varNameLen := int(binary.LittleEndian.Uint32(varNameLenBytes))
+				operands = append(operands, varNameLenBytes)
+				i += 4
+
+				if i+varNameLen > len(rawBytecode) {
+					return nil, fmt.Errorf("invalid bytecode, unexpected end of data for captured variable name")
+				}
+				varNameBytes := rawBytecode[i : i+varNameLen]
+				operands = append(operands, varNameBytes)
+				i += varNameLen
+			}
 
 		default:
 			// Opcodes without operands

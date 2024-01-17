@@ -14,7 +14,8 @@ type Token struct {
 const (
 	LPAREN     = "LPAREN"
 	RPAREN     = "RPAREN"
-	COLON = "COLON"
+	COLON      = "COLON"
+	LAMBDA     = "LAMBDA"
 	IDENT      = "IDENT"
 	NUMBER     = "NUMBER"
 	BOOL       = "BOOL"
@@ -35,6 +36,7 @@ var tokenTypes = []struct {
 	{LPAREN, `^\(`},
 	{RPAREN, `^\)`},
 	{COLON, `^:`},
+	{LAMBDA, `^->`},
 	{BOOL, `^true|^false`},
 	{COMMA, `^,`},
 	{NUMBER, `^-?\d+(\.\d+)?`},
@@ -97,4 +99,25 @@ func (l *Lexer) NextToken() Token {
 	tok = Token{Type: ILLEGAL, Literal: string(l.ch)}
 	l.readChar()
 	return tok
+}
+
+func (l *Lexer) PeekAhead(n int) ([]Token, error) {
+    savedPosition := l.position
+    savedReadPosition := l.readPosition
+    savedChar := l.ch
+
+    var tokens []Token
+    for i := 0; i < n; i++ {
+        token := l.NextToken()
+        tokens = append(tokens, token)
+        if token.Type == EOF {
+            break
+        }
+    }
+
+    l.position = savedPosition
+    l.readPosition = savedReadPosition
+    l.ch = savedChar
+
+    return tokens, nil
 }
