@@ -841,13 +841,12 @@ func (vm *VM) executeLambda(lambdaFunc *LambdaFunction, args []interface{}) (int
 	return returnValue, nil
 }
 
-func (vm *VM) jumpToOpcode(opcode compiler.Opcode) {
-	for vm.pc < len(vm.code) {
-		if vm.code[vm.pc].Opcode == opcode {
-			vm.pc++
-			break
+func (vm *VM) jumpToOpcode(targetOpcode compiler.Opcode) {
+	for i := vm.pc + 1; i < len(vm.code); i++ {
+		if vm.code[i].Opcode == targetOpcode {
+			vm.pc = i
+			return
 		}
-		vm.pc++
 	}
 }
 
