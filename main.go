@@ -10,7 +10,9 @@ import (
 )
 
 func main() {
-	gooCode := "(print (filter ((x:int) -> (> x 0)) (-1 2 0)))"
+	gooCode := "(print(reduce ((acc:int x:int) -> (+ acc x)) 0 (1 2 3)))"
+	//gooCode := "(reduce ((acc:int x:int) -> (+ acc x)) 0 (1 2 3))"
+	//gooCode := "(print (filter ((x:int) -> (> x 0)) (-1 2 0)))"
 	//gooCode := "(filter ((x:int) -> (> x 0)) (-1 2 0))"
 	//gooCode := "(print(map ((x:int) -> (* x 2)) (1 2 3 4 5)))"
 	//gooCode := "(print(map ((x:int) -> (if (> x 0) ('pos') else ('neg'))) (-1 2 -3)))"

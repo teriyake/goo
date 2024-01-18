@@ -801,6 +801,44 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			vm.push(filteredResults)
 			//return nil
+		case compiler.REDUCE:
+			if len(vm.stack) < 3 {
+				return fmt.Errorf("REDUCE operation requires at least three values on the stack (lambda, accumulator, and an element)")
+			}
+
+			numArgsBytes, ok := instruction.Operands[0].([]byte)
+			if !ok {
+				return fmt.Errorf("Invalid operand for REDUCE instruction")
+			}
+			numArgs := int(binary.LittleEndian.Uint32(numArgsBytes))
+
+			lambdaFunc, ok := vm.stack[len(vm.stack)-3].(*LambdaFunction)
+			if !ok {
+				return fmt.Errorf("Expected a lambda function on the stack for REDUCE operation")
+			}
+
+			accumulator := vm.stack[len(vm.stack)-2]
+			nextElement := vm.stack[len(vm.stack)-1]
+
+			args := make([]interface{}, 0, numArgs)
+			args = append(args, accumulator, nextElement)
+
+			result, err := vm.executeLambda(lambdaFunc, args)
+			if err != nil {
+				return err
+			}
+
+			vm.stack[len(vm.stack)-2] = result
+
+			vm.stack = vm.stack[:len(vm.stack)-1]
+
+			if len(vm.stack) == 3 {
+				vm.stack = vm.stack[:len(vm.stack)-3]
+				vm.push(result)
+				return nil
+			}
+
+			//return nil
 		case compiler.JUMP:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("JUMP instruction requires an operand")

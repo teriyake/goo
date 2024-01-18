@@ -36,6 +36,7 @@ const (
 	CALL_FUNCTION
 	MAP = iota + 40
 	FILTER
+	REDUCE
 )
 
 func OpcodeToString(op Opcode) string {
@@ -65,6 +66,7 @@ func OpcodeToString(op Opcode) string {
 		CALL_FUNCTION:   "CALL_FUNCTION",
 		MAP:             "MAP",
 		FILTER:          "FILTER",
+		REDUCE:          "REDUCE",
 	}
 
 	return opcodeStrings[op]
@@ -506,6 +508,8 @@ func (c *Compiler) compileNode(node interface{}) error {
 		return c.compileMapExpression(n)
 	case parser.FilterExpression:
 		return c.compileFilterExpression(n)
+	case parser.ReduceExpression:
+		return c.compileReduceExpression(n)
 
 	default:
 		return fmt.Errorf("unknown node type: %T", n)
@@ -547,6 +551,30 @@ func (c *Compiler) compileFilterExpression(filterExpr parser.FilterExpression) e
 	}
 
 	c.emit(FILTER, len(filterExpr.Arguments))
+
+	return nil
+}
+
+func (c *Compiler) compileReduceExpression(reduceExpr parser.ReduceExpression) error {
+	err := c.compileNode(reduceExpr.Lambda)
+	if err != nil {
+		return err
+	}
+
+	err = c.compileNode(reduceExpr.InitialValue)
+	if err != nil {
+		return err
+	}
+
+	for _, arg := range reduceExpr.Arguments {
+		err = c.compileNode(arg)
+		if err != nil {
+			return err
+		}
+
+		//c.emit(CALL_LAMBDA, 2)
+		c.emit(REDUCE, 2)
+	}
 
 	return nil
 }
@@ -1042,6 +1070,14 @@ func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, map[int]int, er
 			i += 4
 			currentOffset += 4
 		case FILTER:
+			if i+4 > len(rawBytecode) {
+				return nil, nil, fmt.Errorf("invalid bytecode, unexpected end of data")
+			}
+			argLenBytes := rawBytecode[i : i+4]
+			operands = append(operands, argLenBytes)
+			i += 4
+			currentOffset += 4
+		case REDUCE:
 			if i+4 > len(rawBytecode) {
 				return nil, nil, fmt.Errorf("invalid bytecode, unexpected end of data")
 			}

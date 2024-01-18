@@ -68,6 +68,12 @@ type FilterExpression struct {
 	Arguments []interface{}
 }
 
+type ReduceExpression struct {
+	Lambda       interface{}
+	InitialValue interface{}
+	Arguments    []interface{}
+}
+
 type Parser struct {
 	lexer        *lexer.Lexer
 	currentToken lexer.Token
@@ -107,8 +113,10 @@ func (p *Parser) parseExpression() (interface{}, error) {
 			return p.parseVariableDefinition()
 		} else if p.currentToken.Literal == "map" {
 			return p.parseMapExpression()
-		} else if p.currentToken.Literal == "filter"{
+		} else if p.currentToken.Literal == "filter" {
 			return p.parseFilterExpression()
+		} else if p.currentToken.Literal == "reduce" {
+			return p.parseReduceExpression()
 		} else if p.peekTokenIs(lexer.LPAREN) {
 			return p.parseFunctionCall()
 		} else {
@@ -161,9 +169,12 @@ func (p *Parser) parseExpression() (interface{}, error) {
 		p.nextToken()
 		if p.currentToken.Literal == "map" {
 			return p.parseMapExpression()
-		} 
+		}
 		if p.currentToken.Literal == "filter" {
 			return p.parseFilterExpression()
+		}
+		if p.currentToken.Literal == "reduce" {
+			return p.parseReduceExpression()
 		}
 		if p.isLambdaExpression() {
 			lambdaExpr, err := p.parseLambdaExpression()
@@ -307,6 +318,34 @@ func (p *Parser) parseFilterExpression() (interface{}, error) {
 	return FilterExpression{
 		Lambda:    lambdaExpr,
 		Arguments: args,
+	}, nil
+}
+
+func (p *Parser) parseReduceExpression() (interface{}, error) {
+	p.nextToken()
+	p.nextToken()
+
+	lambdaExpr, err := p.parseLambdaExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	p.nextToken()
+	initialValue, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	// Finally, parse the list of arguments
+	args, err := p.parseExpressionList()
+	if err != nil {
+		return nil, err
+	}
+
+	return ReduceExpression{
+		Lambda:       lambdaExpr,
+		InitialValue: initialValue,
+		Arguments:    args,
 	}, nil
 }
 
