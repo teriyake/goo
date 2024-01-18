@@ -336,7 +336,6 @@ func (p *Parser) parseReduceExpression() (interface{}, error) {
 		return nil, err
 	}
 
-	// Finally, parse the list of arguments
 	args, err := p.parseExpressionList()
 	if err != nil {
 		return nil, err

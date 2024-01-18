@@ -1,0 +1,2 @@
+(def genericFun <T> (x:T) (print (x)))
+(genericFunc <T> (6))

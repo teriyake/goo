@@ -1,0 +1,14 @@
+DEBUG MODE ENABLED
+
+Input: (def genericFun <T> (x:T) (print (x)))
+(genericFunc <T> (6))
+
+
+AST: []interface {}{parser.GenericFunctionDefinition{Name:"genericFun", GenericTypes:[]string{"T"}, Params:[]parser.TypeAnnotation{parser.TypeAnnotation{Variable:"x", Type:"T"}}, ReturnType:"", Body:[]interface {}{[]interface {}{parser.Identifier{Value:"print"}, []interface {}{parser.Identifier{Value:"x"}}}}}, parser.GenericFunctionCall{Name:"genericFunc", GenericTypes:[]string{"T"}, Arguments:[]interface {}{parser.Number{Value:6}}}}
+
+  GenericFunctionDefinition: Name: genericFun, GenericTypes: [T], Params: [{x T}], ReturnType: 
+      Identifier: Value: print
+        Identifier: Value: x
+  GenericFunctionCall: Name: genericFunc, GenericTypes: [T], Arguments: [{6}]
+    Number: Value: %!d(float64=6)
+Error compiling AST: unknown node type: parser.GenericFunctionDefinition

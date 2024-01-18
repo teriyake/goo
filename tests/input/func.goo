@@ -1,0 +1,2 @@
+(def mul (x:int y:int) (* x y))
+(print (mul (9 8)))
