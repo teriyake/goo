@@ -31,7 +31,7 @@ func main() {
 	debugMode := flag.Bool("debug", false, "when enabled, the compiler and vm debug outputs will be piped to a log file")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
-		fmt.Println("Usage: ./goo [-debug path/to/log.log] path/to/src.goo")
+		fmt.Println("./goo [-debug path/to/log.log] path/to/src.goo")
 		fmt.Println("\nFlags:")
 		flag.PrintDefaults()
 	}

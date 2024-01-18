@@ -1,0 +1,1 @@
+(print (filter ((x:int) -> (> x 0)) (-1 2 0)))
