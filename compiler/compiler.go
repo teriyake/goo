@@ -215,14 +215,16 @@ type Compiler struct {
 	symbolTable     *SymbolTable
 	currentFunction string
 	insideFunction  bool
+	debugMode       *bool
 }
 
-func NewCompiler() *Compiler {
+func NewCompiler(d *bool) *Compiler {
 	return &Compiler{
 		bytecode:        []byte{},
 		symbolTable:     NewSymbolTable(nil),
 		currentFunction: "",
 		insideFunction:  false,
+		debugMode:       d,
 	}
 }
 
@@ -257,7 +259,7 @@ func (c *Compiler) CompileAST(ast interface{}) ([]BytecodeInstruction, map[int]i
 		return nil, nil, err
 	}
 
-	bytecodeInstructions, offsetMap, err := convertBytecode(c.bytecode)
+	bytecodeInstructions, offsetMap, err := convertBytecode(c.bytecode, c.debugMode)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,7 +291,9 @@ func (c *Compiler) compileNode(node interface{}) error {
 
 			c.symbolTable.DefineVariable(varName, ParseDataType(varType))
 
-			c.symbolTable.Print()
+			if *c.debugMode {
+				c.symbolTable.Print()
+			}
 			//fmt.Printf("Emitting DEFINE_VARIABLE for %s\n", varName.Value)
 			c.emit(DEFINE_VARIABLE, varName)
 			return nil
@@ -474,7 +478,9 @@ func (c *Compiler) compileNode(node interface{}) error {
 		updateJumpInstruction(c.bytecode, jumpInstructionIndex, correctOffset)
 
 		//fmt.Printf("Symbol Table before capturing lambda variables: \n")
-		c.symbolTable.Print()
+		if *c.debugMode {
+			c.symbolTable.Print()
+		}
 		capturedVariables, err := c.determineCapturedVariables(lambdaExpr.Body, lambdaExpr.Params)
 		if err != nil {
 			return fmt.Errorf("Error capturing lambda variables: %v\n", err)
@@ -580,19 +586,25 @@ func (c *Compiler) compileReduceExpression(reduceExpr parser.ReduceExpression) e
 }
 
 func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) error {
-	fmt.Println("Compiling function definition:", fnDef.Name)
+	if *c.debugMode {
+		fmt.Println("Compiling function definition:", fnDef.Name)
+	}
 	startAddress := len(c.bytecode)
 
 	var paramNames []string
 	for _, param := range fnDef.Params {
 		paramNames = append(paramNames, param.Variable)
 		c.symbolTable.DefineVariable(param.Variable, ParseDataType(param.Type))
-		fmt.Printf("Defined variable: %s\n", param)
+		if *c.debugMode {
+			fmt.Printf("Defined variable: %s\n", param)
+		}
 	}
 	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames, ParseDataType(fnDef.ReturnType))
 
-	fmt.Println("Symbol table after defining parameters:")
-	c.symbolTable.Print()
+	if *c.debugMode {
+		fmt.Println("Symbol table after defining parameters:")
+		c.symbolTable.Print()
+	}
 
 	c.emit(JUMP, 0)
 
@@ -622,14 +634,18 @@ func (c *Compiler) compileFunctionDefinition(fnDef parser.FunctionDefinition) er
 	updateJumpInstruction(c.bytecode, startAddress, correctOffset)
 	c.leaveScope()
 
-	fmt.Println("Symbol table after leaving scope:")
-	c.symbolTable.Print()
+	if *c.debugMode {
+		fmt.Println("Symbol table after leaving scope:")
+		c.symbolTable.Print()
+	}
 
 	c.setCurrentFunction("")
 	c.symbolTable.DefineFunction(fnDef.Name, startAddress, paramNames, ParseDataType(fnDef.ReturnType))
 	paramCount := len(fnDef.Params)
 	c.emitDefineFunction(fnDef.Name, startAddress, paramCount, paramNames)
-	fmt.Println("Function compiled:", fnDef.Name)
+	if *c.debugMode {
+		fmt.Println("Function compiled:", fnDef.Name)
+	}
 	return nil
 }
 
@@ -782,8 +798,11 @@ func (c *Compiler) determineCapturedVariables(lambdaBody []interface{}, lambdaPa
 	return capturedVars, err
 }
 
-func convertBytecode(rawBytecode []byte) ([]BytecodeInstruction, map[int]int, error) {
-	fmt.Printf("Raw Bytecode: %v\n", rawBytecode)
+func convertBytecode(rawBytecode []byte, d *bool) ([]BytecodeInstruction, map[int]int, error) {
+	if *d {
+		fmt.Printf("Raw Bytecode: %v\n", rawBytecode)
+	}
+
 	var instructions []BytecodeInstruction
 	offsetToInstructionIndex := make(map[int]int)
 	i := 0

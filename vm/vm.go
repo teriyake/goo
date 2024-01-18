@@ -140,9 +140,10 @@ type VM struct {
 	symbolTableStack []*RuntimeSymbolTable
 	functions        map[string]FunctionMetadata
 	callStack        []CallStackEntry
+	debugMode        *bool
 }
 
-func NewVM(code []compiler.BytecodeInstruction, offsetMap map[int]int) *VM {
+func NewVM(code []compiler.BytecodeInstruction, offsetMap map[int]int, d *bool) *VM {
 	globalSymbolTable := NewRuntimeSymbolTable(nil)
 	return &VM{
 		stack:            make([]interface{}, 0),
@@ -152,6 +153,7 @@ func NewVM(code []compiler.BytecodeInstruction, offsetMap map[int]int) *VM {
 		symbolTableStack: []*RuntimeSymbolTable{globalSymbolTable},
 		functions:        make(map[string]FunctionMetadata),
 		callStack:        make([]CallStackEntry, 0),
+		debugMode:        d,
 	}
 }
 
@@ -223,8 +225,10 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 	for vm.pc = start; vm.pc < end; vm.pc++ {
 		instruction := vm.code[vm.pc]
-		fmt.Printf("Executing Instruction at PC %v: Opcode %d, Operands %v\n", vm.pc, instruction.Opcode, instruction.Operands)
-		vm.Print()
+		if *vm.debugMode {
+			fmt.Printf("Executing Instruction at PC %v: Opcode %d, Operands %v\n", vm.pc, instruction.Opcode, instruction.Operands)
+			vm.Print()
+		}
 
 		switch instruction.Opcode {
 		case compiler.PUSH_NUMBER:
@@ -238,7 +242,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			bits := binary.LittleEndian.Uint64(operandBytes)
 			floatValue := math.Float64frombits(bits)
 			vm.stack = append(vm.stack, floatValue)
-			fmt.Printf("Stack after PUSH_NUMBER: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after PUSH_NUMBER: %v\n", vm.stack)
+			}
 		case compiler.PUSH_BOOL:
 			if len(instruction.Operands) < 1 {
 				return fmt.Errorf("PUSH_BOOL instruction requires an operand")
@@ -249,7 +255,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			}
 			boolValue := operandByte != 0
 			vm.stack = append(vm.stack, boolValue)
-			fmt.Printf("Stack after PUSH_BOOL: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after PUSH_BOOL: %v\n", vm.stack)
+			}
 		case compiler.PUSH_STRING:
 			strLenBytes, ok := instruction.Operands[0].([]byte)
 			if !ok || len(strLenBytes) != 4 {
@@ -263,7 +271,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			}
 			strVal := string(strBytes)
 			vm.stack = append(vm.stack, strVal)
-			fmt.Printf("Stack after PUSH_STRING: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after PUSH_STRING: %v\n", vm.stack)
+			}
 		case compiler.ADD:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("ADD instruction requires at least 2 values on the stack")
@@ -276,7 +286,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			result := operand1 + operand2
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after ADD: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after ADD: %v\n", vm.stack)
+			}
 		case compiler.SUB:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("SUB instruction requires at least 2 values on the stack")
@@ -289,7 +301,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			result := operand1 - operand2
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after SUB: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after SUB: %v\n", vm.stack)
+			}
 		case compiler.MUL:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("MUL instruction requires at least 2 values on the stack")
@@ -302,7 +316,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			result := operand1 * operand2
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after MUL: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after MUL: %v\n", vm.stack)
+			}
 		case compiler.GRT:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("GRT instruction requires at least 2 values on the stack")
@@ -315,7 +331,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			result := operand1 > operand2
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after GRT: %v\n", vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after GRT: %v\n", vm.stack)
+			}
 		case compiler.LESS:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("LESS instruction requires at least 2 values on the stack")
@@ -328,8 +346,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			result := operand1 < operand2
 			vm.stack = vm.stack[:len(vm.stack)-2]
 			vm.stack = append(vm.stack, result)
-			fmt.Printf("Stack after LESS: %v\n", vm.stack)
-
+			if *vm.debugMode {
+				fmt.Printf("Stack after LESS: %v\n", vm.stack)
+			}
 		case compiler.EQ:
 			if len(vm.stack) < 2 {
 				return fmt.Errorf("EQ instruction requires at least 2 values on the stack")
@@ -343,7 +362,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 					result := operand1.(float64) == operand2.(float64)
 					vm.stack = vm.stack[:len(vm.stack)-2]
 					vm.stack = append(vm.stack, result)
-					fmt.Printf("Stack after EQ: %v\n", vm.stack)
+					if *vm.debugMode {
+						fmt.Printf("Stack after EQ: %v\n", vm.stack)
+					}
 				} else {
 					return fmt.Errorf("EQ instruction requires operands of the same type")
 				}
@@ -352,7 +373,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 					result := operand1.(string) == operand2.(string)
 					vm.stack = vm.stack[:len(vm.stack)-2]
 					vm.stack = append(vm.stack, result)
-					fmt.Printf("Stack after EQ: %v\n", vm.stack)
+					if *vm.debugMode {
+						fmt.Printf("Stack after EQ: %v\n", vm.stack)
+					}
 				} else {
 					return fmt.Errorf("EQ instruction requires operands of the same type")
 				}
@@ -373,7 +396,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 					result := operand1.(float64) != operand2.(float64)
 					vm.stack = vm.stack[:len(vm.stack)-2]
 					vm.stack = append(vm.stack, result)
-					fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+					if *vm.debugMode {
+						fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+					}
 				} else {
 					return fmt.Errorf("NEQ instruction requires operands of the same type")
 				}
@@ -382,7 +407,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 					result := operand1.(string) != operand2.(string)
 					vm.stack = vm.stack[:len(vm.stack)-2]
 					vm.stack = append(vm.stack, result)
-					fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+					if *vm.debugMode {
+						fmt.Printf("Stack after NEQ: %v\n", vm.stack)
+					}
 				} else {
 					return fmt.Errorf("NEQ instruction requires operands of the same type")
 				}
@@ -394,10 +421,13 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 				return fmt.Errorf("PRINT instruction requires a value on the stack")
 			}
 			value := vm.stack[len(vm.stack)-1]
-			//fmt.Printf(value)
-			fmt.Println()
-			vmPrint(value)
-			fmt.Println()
+			if *vm.debugMode {
+				fmt.Println()
+				vmPrint(value)
+				fmt.Println()
+			} else {
+				fmt.Println(value)
+			}
 			vm.stack = vm.stack[:len(vm.stack)-1]
 		case compiler.DEFINE_VARIABLE:
 			if len(instruction.Operands) < 1 {
@@ -445,7 +475,6 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			if startIdx, ok := vm.offsetMap[startAddress]; ok {
 				start = startIdx
 			} else {
-				fmt.Printf("start index: %v\n", startIdx)
 				return fmt.Errorf("Invalid start address for lambda")
 			}
 
@@ -611,7 +640,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			}
 
 			vm.stack = append(vm.stack, value)
-			fmt.Printf("Stack after PUSH_VARIABLE (%s): %v\n", varName, vm.stack)
+			if *vm.debugMode {
+				fmt.Printf("Stack after PUSH_VARIABLE (%s): %v\n", varName, vm.stack)
+			}
 		case compiler.DEFINE_FUNCTION:
 			funcNameBytes, ok := instruction.Operands[0].([]byte)
 			if !ok {
@@ -653,17 +684,18 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 					paramNames = append(paramNames, paramName)
 				}
 			}
+
 			vm.functions[funcName] = FunctionMetadata{
 				StartAddress: startAddress,
 				ParamCount:   paramCount,
 				ParamNames:   paramNames,
 			}
 
-			fmt.Printf("Function %s defined with param count: %v and params: %v\n", funcName, paramCount, paramNames)
-			fmt.Printf("Function %s starts at: %v\n", funcName, startAddress)
-
-			fmt.Printf("Current PC: %v\n", vm.pc)
-
+			if *vm.debugMode {
+				fmt.Printf("Function %s defined with param count: %v and params: %v\n", funcName, paramCount, paramNames)
+				fmt.Printf("Function %s starts at: %v\n", funcName, startAddress)
+				fmt.Printf("Current PC: %v\n", vm.pc)
+			}
 		case compiler.CALL_FUNCTION:
 			funcNameLenBytes, ok := instruction.Operands[0].([]byte)
 			if !ok || len(funcNameLenBytes) != 4 {
@@ -678,7 +710,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			}
 
 			funcName := string(funcNameBytes)
-			fmt.Printf("CALL_FUNCTION for %s\n", funcName)
+			if *vm.debugMode {
+				fmt.Printf("CALL_FUNCTION for %s\n", funcName)
+			}
 
 			functionMetadata, ok := vm.functions[funcName]
 			if !ok {
@@ -707,7 +741,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			vm.symbolTableStack = append(vm.symbolTableStack, newSymbolTable)
 			vm.pc = functionMetadata.StartAddress
 
-			fmt.Println("Jumping to function start address:", vm.pc)
+			if *vm.debugMode {
+				fmt.Println("Jumping to function start address:", vm.pc)
+			}
 			continue
 		case compiler.RETURN:
 			if len(vm.callStack) == 0 {
@@ -727,7 +763,9 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 
 			vm.push(returnValue)
 
-			fmt.Printf("Returning to address %d with value %v\n", vm.pc, returnValue)
+			if *vm.debugMode {
+				fmt.Printf("Returning to address %d with value %v\n", vm.pc, returnValue)
+			}
 			continue
 		case compiler.MAP:
 			numArgs := int(binary.LittleEndian.Uint32(instruction.Operands[0].([]byte)))
@@ -849,9 +887,13 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 			}
 			jumpOffset := binary.LittleEndian.Uint32(jumpOffsetBytes)
 
-			fmt.Printf("Current PC: %v\tJump offset: %v\n", vm.pc, jumpOffset)
+			if *vm.debugMode {
+				fmt.Printf("Current PC: %v\tJump offset: %v\n", vm.pc, jumpOffset)
+			}
 			vm.pc += int(jumpOffset)
-			fmt.Printf("Updated PC: %v\n", vm.pc)
+			if *vm.debugMode {
+				fmt.Printf("Updated PC: %v\n", vm.pc)
+			}
 			if vm.pc >= len(vm.code) {
 				return fmt.Errorf("Jump leads to invalid instruction index")
 			}
@@ -878,10 +920,12 @@ func (vm *VM) Run(optionalStartEndAddress ...int) error {
 		}
 	}
 
-	fmt.Println()
-	fmt.Printf("All instructions executed. Last executed instruction PC: %v\n", vm.pc)
-	fmt.Printf("Exiting VM...\n")
-	fmt.Println()
+	if *vm.debugMode {
+		fmt.Println()
+		fmt.Printf("All instructions executed. Last executed instruction PC: %v\n", vm.pc)
+		fmt.Printf("Exiting VM...\n")
+		fmt.Println()
+	}
 	return nil
 }
 
